@@ -35,9 +35,10 @@ const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 let chargeList = [];
 let mode = null;
-const STEP = 2;       // 电场线步长
-const MAX_STEP = 800; // 最大追踪步数
-const THRESHOLD = 15; // 靠近电荷就停止
+
+const STEP = 3;
+const MAX_STEP = 2000; // 大幅增加追踪步数，拉长电场线
+const CHARGE_RADIUS = 14;
 
 document.getElementById('btnPlus').onclick = ()=>{mode='plus';document.getElementById('tip').textContent='当前：放置正电荷，点击画布';}
 document.getElementById('btnMinus').onclick = ()=>{mode='minus';document.getElementById('tip').textContent='当前：放置负电荷，点击画布';}
@@ -54,41 +55,40 @@ canvas.onclick = function(e){
     render();
 }
 
-// 计算某点电场强度Ex Ey
-function getField(px, py){
+// 计算电场【修复公式：返回归一化电场方向向量，固定步长】
+function getFieldNormalized(px, py){
     let Ex=0, Ey=0;
     for(const c of chargeList){
         const dx = px - c.x;
         const dy = py - c.y;
         const r2 = dx*dx + dy*dy;
         const r = Math.sqrt(r2);
-        if(r < THRESHOLD) return null;
+        // 如果靠近任意电荷，直接返回null，终止绘制
+        if(r < CHARGE_RADIUS) return null;
         const E = c.q / r2;
         Ex += E * dx / r;
         Ey += E * dy / r;
     }
-    return {Ex,Ey};
+    const mag = Math.sqrt(Ex*Ex + Ey*Ey);
+    if(mag < 1e-6) return null; // 场强几乎为0，停止
+    // 归一化：只保留方向，保证每一步移动距离固定，不会大步跳跃
+    return {nx: Ex/mag, ny: Ey/mag};
 }
 
 // 绘制单条电场线
-function drawFieldLine(startX, startY, dir){
+function drawFieldLine(startX, startY){
     ctx.beginPath();
     ctx.moveTo(startX, startY);
     let x = startX, y = startY;
     for(let i=0;i<MAX_STEP;i++){
-        const f = getField(x,y);
+        const f = getFieldNormalized(x,y);
         if(!f) break;
-        let nx, ny;
-        if(dir>0){
-            nx = x + f.Ex * STEP;
-            ny = y + f.Ey * STEP;
-        }else{
-            nx = x - f.Ex * STEP;
-            ny = y - f.Ey * STEP;
-        }
-        // 超出画布边界停止
-        if(nx<0||nx>canvas.width||ny<0||ny>canvas.height) break;
-        x=nx; y=ny;
+        const nx = x + f.nx * STEP;
+        const ny = y + f.ny * STEP;
+        // 碰到画布边界，停止
+        if(nx<0 || nx>canvas.width || ny<0 || ny>canvas.height) break;
+        x = nx;
+        y = ny;
         ctx.lineTo(x,y);
     }
     ctx.strokeStyle="#3377ff";
@@ -96,32 +96,31 @@ function drawFieldLine(startX, startY, dir){
     ctx.stroke();
 }
 
-// 主渲染函数：电场线 + 电荷
+// 主渲染函数
 function render(){
     ctx.clearRect(0,0,canvas.width,canvas.height);
-    // 从正电荷表面发射多条电场线
+    // 从正电荷表面发射电场线
     for(const c of chargeList){
         if(c.q > 0){
-            const numLine = 16;
+            const numLine = 16; // 电场线数量，可以修改，越多越密
             for(let i=0;i<numLine;i++){
                 const ang = (i / numLine) * Math.PI * 2;
-                const sx = c.x + Math.cos(ang)*THRESHOLD;
-                const sy = c.y + Math.sin(ang)*THRESHOLD;
-                drawFieldLine(sx, sy, 1);
-                drawFieldLine(sx, sy, -1);
+                const sx = c.x + Math.cos(ang)*CHARGE_RADIUS;
+                const sy = c.y + Math.sin(ang)*CHARGE_RADIUS;
+                drawFieldLine(sx, sy);
             }
         }
     }
-    // 绘制电荷圆圈
+    // 绘制电荷
     for(const c of chargeList){
         ctx.beginPath();
-        ctx.arc(c.x,c.y,12,0,Math.PI*2);
+        ctx.arc(c.x,c.y,CHARGE_RADIUS,0,Math.PI*2);
         ctx.fillStyle = c.q>0 ? '#f44' : '#44f';
         ctx.fill();
         ctx.fillStyle='#fff';
-        ctx.font="16px sans-serif";
+        ctx.font="18px sans-serif";
         ctx.textAlign="center";
-        ctx.fillText(c.q>0?"+":"−",c.x,c.y+5);
+        ctx.fillText(c.q>0?"+":"−",c.x,c.y+6);
     }
 }
 
