@@ -55,9 +55,6 @@
             font-size: 10px; color: #4a7a92;
             margin-left: 3px; font-weight: 600;
         }
-        .stat.energy .stat-value { color: #ffd966; text-shadow: 0 0 14px rgba(255, 217, 102, 0.5); }
-        .stat.energy.pos .stat-value { color: #ff8a8a; text-shadow: 0 0 14px rgba(255, 100, 100, 0.5); }
-        .stat.energy.neg .stat-value { color: #7ab8ff; text-shadow: 0 0 14px rgba(100, 150, 255, 0.5); }
         .stat.timer .stat-value { color: #7dd8a0; text-shadow: 0 0 12px rgba(125, 216, 160, 0.4); }
         .stat.timer.warning .stat-value { color: #ffa502; text-shadow: 0 0 14px rgba(255, 165, 2, 0.6); }
         .stat.timer.critical .stat-value { color: #ff4757; text-shadow: 0 0 16px rgba(255, 71, 87, 0.8); animation: pulse 0.9s infinite; }
@@ -66,24 +63,6 @@
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.75; }
-        }
-
-        /* ===== 能量条 ===== */
-        .energy-bar-container {
-            position: fixed; bottom: 0; left: 0; right: 0;
-            height: 6px;
-            background: rgba(10, 20, 30, 0.8);
-            z-index: 20;
-            overflow: hidden;
-        }
-        .energy-bar {
-            height: 100%;
-            width: 50%;
-            background: linear-gradient(90deg, #4d7cff, #2ed573, #ffd966, #ff5c6c);
-            background-size: 200% 100%;
-            transition: width 0.45s ease-out, background-position 0.6s ease;
-            border-radius: 0 3px 3px 0;
-            box-shadow: 0 0 12px rgba(100, 200, 255, 0.5);
         }
 
         /* ===== 提示条 ===== */
@@ -291,13 +270,13 @@
 <!-- HUD 面板 -->
 <div id="hud">
     <div class="hud-panel" id="panelLeft">
-        <div class="stat energy" id="statEnergy">
-            <div class="stat-label">⚡ 电势能</div>
-            <div class="stat-value"><span id="energyVal">0.00</span><span class="stat-unit">J</span></div>
-        </div>
         <div class="stat collect">
             <div class="stat-label">◎ 收集</div>
             <div class="stat-value"><span id="collectVal">0/3</span></div>
+        </div>
+        <div class="stat flip">
+            <div class="stat-label">⇄ 翻转</div>
+            <div class="stat-value"><span id="flipVal">0</span></div>
         </div>
     </div>
     <div class="hud-panel" id="panelRight">
@@ -305,16 +284,7 @@
             <div class="stat-label">⏱ 时间</div>
             <div class="stat-value"><span id="timeVal">0.0</span><span class="stat-unit">s</span></div>
         </div>
-        <div class="stat flip">
-            <div class="stat-label">⇄ 翻转</div>
-            <div class="stat-value"><span id="flipVal">0</span></div>
-        </div>
     </div>
-</div>
-
-<!-- 能量条 -->
-<div class="energy-bar-container">
-    <div class="energy-bar" id="energyBar"></div>
 </div>
 
 <!-- 提示 -->
@@ -381,61 +351,31 @@ const clamp = (v, a, b) => v < a ? a : (v > b ? b : v);
 const dist  = (x1, y1, x2, y2) => Math.hypot(x1 - x2, y1 - y2);
 
 // ============================================================
-//  数值显示 —— 低频更新 + 迟滞 + 步进
+//  数值显示 —— 仅保留计时和计数
 // ============================================================
-const NUM_CONFIG = {
-    energy:   { decimals: 2, updateInterval: 0.40, deadZone: 0.005, lerp: 8.0 },
-    time:     { decimals: 1, updateInterval: 0.20, deadZone: 0.05,  lerp: 10.0 },
-    collect:  { decimals: 0, updateInterval: 0,    deadZone: 0,     lerp: 1.0 },
-    flip:     { decimals: 0, updateInterval: 0,    deadZone: 0,     lerp: 1.0 },
-};
-
 const display = {
-    energy:     { el: document.getElementById('energyVal'),     current: 0, target: 0, timer: 0 },
-    time:       { el: document.getElementById('timeVal'),       current: 0, target: 0, timer: 0 },
-    collect:    { el: document.getElementById('collectVal'),    current: 0, target: 0, timer: 0 },
-    flip:       { el: document.getElementById('flipVal'),       current: 0, target: 0, timer: 0 },
+    time:    { el: document.getElementById('timeVal'), current: 0, target: 0, timer: 0, decimals: 1, updateInterval: 0.2, deadZone: 0.05, lerp: 10 },
+    collect: { el: document.getElementById('collectVal'), current: 0, target: 0, timer: 0, decimals: 0, updateInterval: 0, deadZone: 0, lerp: 1 },
+    flip:    { el: document.getElementById('flipVal'), current: 0, target: 0, timer: 0, decimals: 0, updateInterval: 0, deadZone: 0, lerp: 1 },
 };
 
 function updateDisplayValues(dt) {
     for (const key in display) {
         const d = display[key];
-        const cfg = NUM_CONFIG[key];
-        if (cfg.updateInterval > 0) {
+        if (d.updateInterval > 0) {
             d.timer += dt;
-            if (d.timer < cfg.updateInterval) continue;
+            if (d.timer < d.updateInterval) continue;
             d.timer = 0;
         }
         const diff = d.target - d.current;
-        if (Math.abs(diff) < cfg.deadZone) {
-            if (Math.abs(diff) > 0.0001) {
-                d.current = d.target;
-                d.el.textContent = d.current.toFixed(cfg.decimals);
-            }
+        if (Math.abs(diff) < d.deadZone) {
+            if (Math.abs(diff) > 0.0001) { d.current = d.target; d.el.textContent = d.current.toFixed(d.decimals); }
             continue;
         }
-        const smooth = 1 - Math.pow(1 / (1 + cfg.lerp), dt * 60);
+        const smooth = 1 - Math.pow(1 / (1 + d.lerp), dt * 60);
         d.current += diff * smooth;
-        if (Math.abs(d.target - d.current) < cfg.deadZone * 0.5) d.current = d.target;
-        d.el.textContent = d.current.toFixed(cfg.decimals);
-    }
-}
-
-function setEnergyDisplay(U) {
-    if (Math.abs(U - display.energy.target) > 0.01) {
-        display.energy.target = U;
-    }
-    const stat = document.getElementById('statEnergy');
-    let newClass = 'stat energy';
-    if (U > 80000) newClass += ' pos';
-    else if (U < -80000) newClass += ' neg';
-    if (stat.className !== newClass) stat.className = newClass;
-
-    if (!setEnergyDisplay._lastBar || performance.now() - setEnergyDisplay._lastBar > 300) {
-        setEnergyDisplay._lastBar = performance.now();
-        const bar = document.getElementById('energyBar');
-        const norm = clamp((U + 2000000) / 4000000, 0, 1);
-        bar.style.width = (norm * 100) + '%';
+        if (Math.abs(d.target - d.current) < d.deadZone * 0.5) d.current = d.target;
+        d.el.textContent = d.current.toFixed(d.decimals);
     }
 }
 
@@ -449,7 +389,6 @@ function setTimeDisplay(t) {
     }
     if (stat.className !== newClass) stat.className = newClass;
 }
-
 function setCollectDisplay(collected, total) {
     document.getElementById('collectVal').textContent = collected + '/' + total;
 }
@@ -602,40 +541,44 @@ const RANDOM_EVENTS = [
     {
         id: 'new_particle',
         apply: () => {
-            for (let attempt = 0; attempt < 100; attempt++) {
-                const x = rnd(W * 0.25, W * 0.75);
-                const y = rnd(60, H - 60);
-                let ok = true;
-                for (const c of state.fixed) {
-                    if (c.type === 'point' && dist(x, y, c.x, c.y) < c.shellR + 30) { ok = false; break; }
-                    if (c.type === 'ring' && Math.abs(dist(x, y, c.x, c.y) - c.R) < 30) { ok = false; break; }
-                    if (c.type === 'disk' && dist(x, y, c.x, c.y) < c.R + 30) { ok = false; break; }
-                    if (c.type === 'line' && Math.abs(x - c.x) < 30) { ok = false; break; }
-                }
-                if (ok) {
-                    state.collectibles.push({ x, y, r: 8, collected: false, pulse: 0, hue: rnd(0, 360) });
-                    break;
+            // 优化：在已有道具附近生成，保证可达性
+            if (state.collectibles.length > 0 && Math.random() < 0.7) {
+                // 靠近已有道具生成
+                const ref = state.collectibles[Math.floor(Math.random() * state.collectibles.length)];
+                for (let attempt = 0; attempt < 80; attempt++) {
+                    const a = rnd(0, Math.PI * 2);
+                    const r = rnd(60, 140);
+                    const x = clamp(ref.x + Math.cos(a) * r, 50, W - 50);
+                    const y = clamp(ref.y + Math.sin(a) * r, 50, H - 50);
+                    if (isValidCollectiblePos(x, y)) {
+                        state.collectibles.push({ x, y, r: 8, collected: false, pulse: 0, hue: rnd(0, 360) });
+                        sfxEvent();
+                        showToast('✨ 新粒子出现！', 1500, 'success');
+                        return;
+                    }
                 }
             }
-            sfxEvent();
-            showToast('✨ 新粒子出现！', 1500, 'success');
+            // 退化：在中间区域生成
+            for (let attempt = 0; attempt < 150; attempt++) {
+                const x = rnd(W * 0.35, W * 0.65);
+                const y = rnd(H * 0.25, H * 0.75);
+                if (isValidCollectiblePos(x, y)) {
+                    state.collectibles.push({ x, y, r: 8, collected: false, pulse: 0, hue: rnd(0, 360) });
+                    sfxEvent();
+                    showToast('✨ 新粒子出现！', 1500, 'success');
+                    return;
+                }
+            }
         }
     },
     {
         id: 'teleport',
         apply: () => {
             if (state.test) {
-                for (let attempt = 0; attempt < 200; attempt++) {
+                for (let attempt = 0; attempt < 300; attempt++) {
                     const x = rnd(50, W - 50);
                     const y = rnd(50, H - 50);
-                    let ok = true;
-                    for (const c of state.fixed) {
-                        if (c.type === 'point' && dist(x, y, c.x, c.y) < c.shellR + state.test.r + 10) { ok = false; break; }
-                        if (c.type === 'ring' && Math.abs(dist(x, y, c.x, c.y) - c.R) < state.test.r + 15) { ok = false; break; }
-                        if (c.type === 'disk' && dist(x, y, c.x, c.y) < c.R + state.test.r + 10) { ok = false; break; }
-                        if (c.type === 'line' && Math.abs(x - c.x) < state.test.r + 20) { ok = false; break; }
-                    }
-                    if (ok) {
+                    if (isValidTestPos(x, y)) {
                         state.test.x = x; state.test.y = y;
                         state.test.vx = 0; state.test.vy = 0;
                         break;
@@ -647,6 +590,41 @@ const RANDOM_EVENTS = [
         }
     },
 ];
+
+// ============================================================
+//  位置有效性检查
+// ============================================================
+function isValidCollectiblePos(x, y) {
+    // 不能太靠近试验电荷起始位置
+    if (state.test && dist(x, y, state.test.x, state.test.y) < 60) return false;
+    // 不能太靠近目标
+    if (state.goal && dist(x, y, state.goal.x, state.goal.y) < 60) return false;
+    // 不能与固定电荷重叠
+    for (const c of state.fixed) {
+        if (c.type === 'point' && dist(x, y, c.x, c.y) < c.shellR + 25) return false;
+        if (c.type === 'ring' && Math.abs(dist(x, y, c.x, c.y) - c.R) < 25) return false;
+        if (c.type === 'disk' && dist(x, y, c.x, c.y) < c.R + 25) return false;
+        if (c.type === 'line' && Math.abs(x - c.x) < 25) return false;
+    }
+    // 不能与其他道具重叠
+    for (const col of state.collectibles) {
+        if (!col.collected && dist(x, y, col.x, col.y) < 45) return false;
+    }
+    // 必须在画布内且留有余量
+    if (x < 40 || x > W - 40 || y < 40 || y > H - 40) return false;
+    return true;
+}
+
+function isValidTestPos(x, y) {
+    for (const c of state.fixed) {
+        if (c.type === 'point' && dist(x, y, c.x, c.y) < c.shellR + state.test.r + 5) return false;
+        if (c.type === 'ring' && Math.abs(dist(x, y, c.x, c.y) - c.R) < state.test.r + 10) return false;
+        if (c.type === 'disk' && dist(x, y, c.x, c.y) < c.R + state.test.r + 5) return false;
+        if (c.type === 'line' && Math.abs(x - c.x) < state.test.r + 15) return false;
+    }
+    if (x < 30 || x > W - 30 || y < 30 || y > H - 30) return false;
+    return true;
+}
 
 // ============================================================
 //  模型定义
@@ -913,11 +891,9 @@ function newGame() {
     state.paused = false;
     state._warnedGoal = false;
 
-    display.energy.current = 0; display.energy.target = 0;
     display.time.current = 0; display.time.target = 0;
     display.collect.current = 0; display.collect.target = 0;
     display.flip.current = 0; display.flip.target = 0;
-    document.getElementById('energyVal').textContent = '0.00';
     document.getElementById('timeVal').textContent = '0.0';
     document.getElementById('collectVal').textContent = '0/3';
     document.getElementById('flipVal').textContent = '0';
@@ -944,7 +920,7 @@ function newGame() {
 
     const testR = clamp(S * 0.022, 11, 18);
     let testPos = null;
-    for (let attempt = 0; attempt < 500; attempt++) {
+    for (let attempt = 0; attempt < 600; attempt++) {
         const x = rnd(margin, W * 0.30);
         const y = rnd(margin, H - margin);
         let ok = true;
@@ -959,12 +935,13 @@ function newGame() {
     if (!testPos) testPos = { x: W * 0.15, y: H / 2 };
     state.test = { x: testPos.x, y: testPos.y, vx: 0, vy: 0, r: testR };
 
+    // 目标：选择离试验电荷较远、但可达的位置
     const goalR = clamp(S * 0.070, 36, 55);
     let goalPos = null;
-    for (let attempt = 0; attempt < 500; attempt++) {
+    for (let attempt = 0; attempt < 600; attempt++) {
         const x = rnd(W * 0.65, W - margin);
         const y = rnd(margin, H - margin);
-        if (dist(x, y, state.test.x, state.test.y) < goalR * 2.0) continue;
+        if (dist(x, y, state.test.x, state.test.y) < goalR * 2.5) continue;
         let ok = true;
         for (const c of state.fixed) {
             if (c.type === 'point' && dist(x, y, c.x, c.y) < c.shellR + goalR + 24) { ok = false; break; }
@@ -977,26 +954,67 @@ function newGame() {
     if (!goalPos) goalPos = { x: W * 0.80, y: H * 0.70 };
     state.goal = { x: goalPos.x, y: goalPos.y, r: goalR };
 
+    // ============================================================
+    //  优化道具布局：使用更可靠的生成策略
+    // ============================================================
     state.collectibles = [];
-    for (let i = 0; i < state.goalParticles; i++) {
-        for (let attempt = 0; attempt < 300; attempt++) {
-            const x = rnd(W * 0.30, W * 0.70);
-            const y = rnd(margin, H - margin);
-            if (dist(x, y, state.test.x, state.test.y) < 80) continue;
-            if (dist(x, y, state.goal.x, state.goal.y) < 80) continue;
-            let ok = true;
-            for (const c of state.fixed) {
-                if (c.type === 'point' && dist(x, y, c.x, c.y) < c.shellR + 30) { ok = false; break; }
-                if (c.type === 'ring' && Math.abs(dist(x, y, c.x, c.y) - c.R) < 30) { ok = false; break; }
-                if (c.type === 'disk' && dist(x, y, c.x, c.y) < c.R + 30) { ok = false; break; }
-                if (c.type === 'line' && Math.abs(x - c.x) < 30) { ok = false; break; }
-            }
-            if (ok) {
+    const numParticles = state.goalParticles;
+
+    // 策略：在起点和终点之间，沿路径均匀分布，并留出可绕行空间
+    for (let i = 0; i < numParticles; i++) {
+        let placed = false;
+
+        // 尝试 1：沿起点-终点的中间区域，按垂直方向偏移生成
+        const t = (i + 1) / (numParticles + 1); // 0~1 之间的比例
+        const baseX = state.test.x + (state.goal.x - state.test.x) * t;
+        const baseY = state.test.y + (state.goal.y - state.test.y) * t;
+        // 垂直方向
+        const dx = state.goal.x - state.test.x;
+        const dy = state.goal.y - state.test.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const perpX = -dy / len;
+        const perpY = dx / len;
+        // 两个垂直方向都试试
+        for (const sign of [1, -1, 1.5, -1.5, 2, -2]) {
+            const offset = sign * 90;
+            const x = clamp(baseX + perpX * offset, 60, W - 60);
+            const y = clamp(baseY + perpY * offset, 60, H - 60);
+            if (isValidCollectiblePos(x, y)) {
                 state.collectibles.push({ x, y, r: 8, collected: false, pulse: 0, hue: i * 120 });
+                placed = true;
                 break;
             }
         }
+
+        // 尝试 2：在目标附近绕圈生成
+        if (!placed) {
+            for (let attempt = 0; attempt < 200; attempt++) {
+                const a = rnd(0, Math.PI * 2);
+                const r = rnd(goalR + 40, goalR + 140);
+                const x = clamp(state.goal.x + Math.cos(a) * r, 60, W - 60);
+                const y = clamp(state.goal.y + Math.sin(a) * r, 60, H - 60);
+                if (isValidCollectiblePos(x, y)) {
+                    state.collectibles.push({ x, y, r: 8, collected: false, pulse: 0, hue: i * 120 });
+                    placed = true;
+                    break;
+                }
+            }
+        }
+
+        // 尝试 3：全图随机，但保证可达性
+        if (!placed) {
+            for (let attempt = 0; attempt < 300; attempt++) {
+                const x = rnd(W * 0.25, W * 0.75);
+                const y = rnd(H * 0.2, H * 0.8);
+                if (isValidCollectiblePos(x, y)) {
+                    state.collectibles.push({ x, y, r: 8, collected: false, pulse: 0, hue: i * 120 });
+                    placed = true;
+                    break;
+                }
+            }
+        }
     }
+
     setCollectDisplay(0, state.collectibles.length);
 }
 
@@ -1053,25 +1071,6 @@ function fieldLine(t, c) {
     return { fx: k * nx, fy: 0 };
 }
 
-function calcPotentialEnergy() {
-    const t = state.test;
-    if (!t) return 0;
-    let U = 0;
-    for (const c of state.fixed) {
-        if (c.type === 'point') {
-            const d = Math.max(dist(t.x, t.y, c.x, c.y), SOFT);
-            U += (c.sign * Q_FIXED * 1.0) / d;
-        } else if (c.type === 'ring' || c.type === 'disk') {
-            const d = Math.max(dist(t.x, t.y, c.x, c.y), SOFT);
-            U += (c.sign * c.charge * Q_FIXED * 1.0) / d;
-        } else if (c.type === 'line') {
-            const d = Math.max(Math.abs(t.x - c.x), SOFT);
-            U += -(c.sign * c.charge * Q_FIXED * 1.0) * Math.log(d / 100);
-        }
-    }
-    return U;
-}
-
 // ============================================================
 //  逻辑更新
 // ============================================================
@@ -1109,9 +1108,6 @@ function update(dt) {
     } else {
         setTimeDisplay(state.elapsed);
     }
-
-    const U = calcPotentialEnergy();
-    setEnergyDisplay(U);
 
     state.eventTimer += dt;
     if (state.eventTimer >= state.eventInterval) {
@@ -1491,11 +1487,8 @@ function drawLineCharge(c, rgb, pulseFactor, now) {
 function drawTestCharge(now) {
     const t = state.test;
     if (!t) return;
-    const U = calcPotentialEnergy();
-    const intensity = clamp(U / 2e6, -1, 1);
-    const r = Math.round(46 + 80 * Math.max(0, intensity));
-    const g = Math.round(213 - 50 * Math.abs(intensity));
-    const b = Math.round(115 + 100 * Math.max(0, -intensity));
+    // 不再根据电势能变色，使用固定绿色
+    const r = 46, g = 213, b = 115;
     const pulse = 1 + Math.sin(now / 200) * 0.08;
     const grad = ctx.createRadialGradient(t.x, t.y, t.r * 0.5, t.x, t.y, t.r * 3 * pulse);
     grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.25)`);
@@ -1504,7 +1497,7 @@ function drawTestCharge(now) {
     ctx.beginPath(); ctx.arc(t.x, t.y, t.r * 3 * pulse, 0, Math.PI * 2); ctx.fill();
     ctx.save();
     ctx.shadowColor = `rgb(${r}, ${g}, ${b})`;
-    ctx.shadowBlur = 22 + 18 * Math.abs(intensity);
+    ctx.shadowBlur = 22;
     ctx.beginPath(); ctx.arc(t.x, t.y, t.r, 0, Math.PI * 2);
     ctx.fillStyle = `rgb(${r}, ${g}, ${b})`; ctx.fill();
     ctx.restore();
