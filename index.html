@@ -1,455 +1,678 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>静电场小游戏 · 电势能探险</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>静电场 · 多模型电势能探险</title>
     <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            user-select: none;
+        html, body {
+            margin: 0; padding: 0; height: 100%;
+            background: #0f0f1a;
+            overflow: hidden;
+            font-family: system-ui, -apple-system, "PingFang SC", sans-serif;
+            -webkit-user-select: none; user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
-
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            background: linear-gradient(145deg, #0b1a2e, #1b2f44);
-            font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
-            padding: 16px;
-        }
-
-        .game-container {
-            background: #1e3b4f;
-            padding: 24px 28px 30px 28px;
-            border-radius: 48px 48px 32px 32px;
-            box-shadow: 0 20px 30px rgba(0, 0, 0, 0.7), inset 0 0 8px #5e8a9c;
-            border: 1px solid #84b7c9;
-        }
-
-        canvas {
-            display: block;
-            margin: 0 auto;
-            width: 720px;
-            height: 500px;
-            border-radius: 24px;
-            background: #101f2b;
-            box-shadow: inset 0 0 40px #00000066, 0 10px 18px #00000080;
-            cursor: crosshair;
-            border: 2px solid #54889b;
-        }
-
-        .panel {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 18px;
-            color: #d4edff;
-            text-shadow: 0 2px 4px black;
-            font-weight: 500;
-        }
-
-        .stats {
-            display: flex;
-            gap: 32px;
-            background: #0d232fcc;
-            padding: 12px 26px;
-            border-radius: 60px;
-            backdrop-filter: blur(4px);
-            border: 1px solid #3e7e94;
-            box-shadow: inset 0 0 6px #6ba3b9;
-        }
-
-        .stat-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .stat-label {
-            font-size: 1.1rem;
-            letter-spacing: 0.5px;
-            color: #a1c9dd;
-        }
-
-        .stat-value {
-            font-size: 1.7rem;
-            font-weight: 700;
-            color: #f2ffb0;
-            text-shadow: 0 0 12px #aaffdd;
-            min-width: 80px;
-            text-align: right;
-            font-variant-numeric: tabular-nums;
-        }
-
-        .unit {
-            font-size: 1rem;
-            margin-left: 4px;
-            color: #8bb3c7;
-        }
-
-        button {
-            background: #2b586e;
-            border: none;
-            padding: 12px 28px;
-            border-radius: 40px;
-            font-size: 1.2rem;
-            font-weight: 700;
-            color: #e6f7ff;
-            letter-spacing: 0.5px;
-            cursor: pointer;
-            box-shadow: 0 8px 0 #0d1e28, 0 6px 12px black;
-            transition: all 0.07s ease;
-            border: 1px solid #7db6cc;
-            text-shadow: 0 2px 3px black;
-        }
-
-        button:active {
-            transform: translateY(5px);
-            box-shadow: 0 3px 0 #0d1e28, 0 6px 12px black;
-        }
-
-        button:hover {
-            background: #357a91;
-            box-shadow: 0 8px 0 #0d1e28, 0 8px 18px #99e6ff;
-        }
-
-        .hint {
-            font-size: 0.95rem;
-            color: #9dc7db;
-            background: #16303eb0;
-            padding: 8px 18px;
-            border-radius: 30px;
-            border-left: 6px solid #b3e4ff;
-            margin-top: 10px;
-            text-align: center;
-        }
+        #game { display: block; width: 100%; height: 100%; touch-action: none; }
     </style>
 </head>
 <body>
-    <div class="game-container">
-        <canvas id="gameCanvas" width="720" height="500"></canvas>
-        <div class="panel">
-            <div class="stats">
-                <div class="stat-item">
-                    <span class="stat-label">⚡ 电势能</span>
-                    <span id="energyValue" class="stat-value">0.0</span>
-                    <span class="unit">J</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">🎯 电荷量</span>
-                    <span id="chargeValue" class="stat-value">1.0</span>
-                    <span class="unit">C</span>
-                </div>
-            </div>
-            <button id="resetButton">重新开始</button>
-        </div>
-        <div class="hint">
-            🧲 鼠标移动小球 · 靠近正电荷电势能升高 · 释放鼠标重置位置
-        </div>
-    </div>
+<canvas id="game"></canvas>
 
-    <script>
-        (function(){
-            const canvas = document.getElementById('gameCanvas');
-            const ctx = canvas.getContext('2d');
-            const energySpan = document.getElementById('energyValue');
-            const chargeSpan = document.getElementById('chargeValue');
+<script>
+(function () {
+'use strict';
 
-            // 固定电场参数 —— 模拟两个点电荷产生的静电场
-            // 正电荷 (红色) : 位于 (200, 200) ，电荷量 Q1 = +2.0 C (为视觉和计算放大)
-            // 负电荷 (蓝色) : 位于 (520, 320) ，电荷量 Q2 = -1.5 C
-            const fixedCharges = [
-                { x: 200, y: 200, q: 2.0, color: '#ff5e6b', label: '+2.0C' },
-                { x: 520, y: 320, q: -1.5, color: '#4f9fff', label: '-1.5C' }
+// ============================================================
+//  基础工具
+// ============================================================
+const rnd   = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => v < a ? a : (v > b ? b : v);
+const dist  = (x1, y1, x2, y2) => Math.hypot(x1 - x2, y1 - y2);
+
+// ============================================================
+//  画布初始化
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+let W = 0, H = 0;
+
+function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = canvas.clientWidth;
+    H = canvas.clientHeight;
+    canvas.width  = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+// ============================================================
+//  物理参数
+// ============================================================
+const SOFT       = 30;      // 软化距离
+const Q_FIXED    = 1.6e7;   // 固定电荷电量
+const MASS       = 0.06;    // 试验电荷质量
+const DRAG       = 0.55;    // 阻尼系数
+const MAX_SPEED  = 350;     // 速度上限 px/s
+const FAR_BOOST  = 0.007;   // 远距离力增强系数
+
+// ============================================================
+//  游戏状态
+// ============================================================
+const state = {
+    test:    null,
+    fixed:   [],
+    goal:    null,
+    flipped: 0,
+    elapsed: 0,
+    phase:   'playing',   // playing | won
+    trail:   [],
+    winAt:   0,
+    modelIndex: 0,
+};
+
+// ============================================================
+//  模型定义 —— 5 种静电场模型
+// ============================================================
+const MODELS = [
+    {   // 0: 双电荷
+        name: '双电荷',
+        desc: '正负点电荷 · 经典偶极子',
+        initFixed: () => {
+            const S = Math.min(W, H);
+            const margin = Math.max(60, S * 0.18);
+            return [
+                { x: margin, y: margin, sign: 1 },
+                { x: W - margin, y: H - margin, sign: -1 },
             ];
-
-            // 可移动电荷 (小球) 属性
-            let testCharge = {
-                x: 360,
-                y: 250,
-                q: 1.0,          // 试探电荷电荷量 +1.0 C (正电荷)
-                radius: 16,
-                color: '#ffd966'
-            };
-
-            // 是否正在拖动（鼠标在小球内按下）
-            let isDragging = false;
-            // 鼠标是否在canvas内用于更新位置（仅在拖动时移动小球）
-            let mouseInside = false;
-
-            // 电势能常量 (库仑常数k, 为了游戏数值可视，调整k=1 让数值好看)
-            const k = 1.0;   // 实际k=9e9，但为了游戏演示，我们缩小数值让电势能变化在合理范围
-
-            // 计算点电荷之间的电势能 U = k * q1 * q2 / r
-            // 小球与所有固定电荷之间的电势能之和
-            function calculatePotentialEnergy(px, py) {
-                let totalEnergy = 0;
-                for (let fc of fixedCharges) {
-                    const dx = px - fc.x;
-                    const dy = py - fc.y;
-                    const dist = Math.sqrt(dx*dx + dy*dy);
-                    // 避免除以零（距离太近时限制最小值）
-                    const safeDist = Math.max(dist, 25);  // 小于25像素按25算，防止无穷大
-                    // 电势能 U = k * Q_fixed * q_test / r
-                    totalEnergy += (k * fc.q * testCharge.q) / safeDist;
-                }
-                return totalEnergy;
+        },
+    },
+    {   // 1: 四极子
+        name: '四极子',
+        desc: '两对正负电荷交替排列',
+        initFixed: () => {
+            const S = Math.min(W, H);
+            const cx = W / 2, cy = H / 2;
+            const d = S * 0.28;
+            return [
+                { x: cx - d, y: cy - d, sign: 1 },
+                { x: cx + d, y: cy - d, sign: -1 },
+                { x: cx - d, y: cy + d, sign: -1 },
+                { x: cx + d, y: cy + d, sign: 1 },
+            ];
+        },
+    },
+    {   // 2: 平行板
+        name: '平行板',
+        desc: '上下极板模拟匀强电场',
+        initFixed: () => {
+            const S = Math.min(W, H);
+            const margin = Math.max(50, S * 0.14);
+            const n = 5;
+            const xs = [];
+            for (let i = 0; i < n; i++) {
+                xs.push(margin + (i / (n - 1)) * (W - 2 * margin));
             }
-
-            // 更新显示的电势能
-            function updateEnergyDisplay() {
-                const energy = calculatePotentialEnergy(testCharge.x, testCharge.y);
-                energySpan.textContent = energy.toFixed(2);
-            }
-
-            // 绘制场景
-            function draw() {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-                // 绘制电场线 / 等势线？为了视觉上更“电场”，绘制一些淡淡的径向渐变
-                // 从两个固定电荷周围绘制光晕
-                for (let fc of fixedCharges) {
-                    const gradient = ctx.createRadialGradient(fc.x, fc.y, 5, fc.x, fc.y, 200);
-                    gradient.addColorStop(0, fc.q > 0 ? 'rgba(255, 80, 100, 0.25)' : 'rgba(80, 150, 255, 0.25)');
-                    gradient.addColorStop(0.7, 'rgba(30, 60, 90, 0)');
-                    ctx.fillStyle = gradient;
-                    ctx.beginPath();
-                    ctx.arc(fc.x, fc.y, 200, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-
-                // 绘制潜在的等势线？ 简单绘制两个同心圆环示意
-                ctx.save();
-                ctx.globalAlpha = 0.15;
-                ctx.strokeStyle = '#bbd9ff';
-                ctx.lineWidth = 1.2;
-                for (let fc of fixedCharges) {
-                    for (let r = 50; r <= 200; r += 40) {
-                        ctx.beginPath();
-                        ctx.arc(fc.x, fc.y, r, 0, Math.PI * 2);
-                        ctx.stroke();
-                    }
-                }
-                ctx.restore();
-
-                // 绘制固定电荷(点电荷)
-                for (let fc of fixedCharges) {
-                    // 光晕
-                    ctx.shadowColor = fc.q > 0 ? '#ff8a9f' : '#6aafff';
-                    ctx.shadowBlur = 22;
-                    // 主球体
-                    ctx.beginPath();
-                    ctx.arc(fc.x, fc.y, 22, 0, Math.PI * 2);
-                    ctx.fillStyle = fc.q > 0 ? '#e6394a' : '#2d7fe0';
-                    ctx.fill();
-                    // 内圈高光
-                    ctx.shadowBlur = 8;
-                    ctx.beginPath();
-                    ctx.arc(fc.x-4, fc.y-4, 8, 0, Math.PI*2);
-                    ctx.fillStyle = fc.q > 0 ? '#ffb3b8' : '#b0d4ff';
-                    ctx.fill();
-                    // 标签
-                    ctx.shadowBlur = 0;
-                    ctx.font = 'bold 15px "Segoe UI", monospace';
-                    ctx.fillStyle = '#ffffff';
-                    ctx.shadowColor = '#000000';
-                    ctx.shadowBlur = 8;
-                    ctx.fillText(fc.label, fc.x - 28, fc.y - 34);
-                    // 重置阴影
-                    ctx.shadowBlur = 0;
-                }
-
-                // 绘制试探电荷（可移动小球）
-                // 首先画小球周围的“电场力”感 —— 动态颜色取决于电势能？可以画根据电势能的小光环
-                const currentEnergy = calculatePotentialEnergy(testCharge.x, testCharge.y);
-                const energyNorm = Math.min(Math.abs(currentEnergy) / 2.5, 1.0); // 用于颜色强度
-
-                // 外光环（代表电势能）
-                ctx.shadowColor = '#ffe484';
-                ctx.shadowBlur = 30 + 30 * energyNorm;
-                ctx.beginPath();
-                ctx.arc(testCharge.x, testCharge.y, testCharge.radius + 4 + 4 * energyNorm, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(255, 240, 150, ${0.2 + 0.3 * energyNorm})`;
-                ctx.fill();
-
-                // 小球本体
-                ctx.shadowBlur = 25;
-                ctx.shadowColor = '#f0e68c';
-                ctx.beginPath();
-                ctx.arc(testCharge.x, testCharge.y, testCharge.radius, 0, Math.PI * 2);
-                // 根据电势能微调颜色 (正能量偏红，负能量偏蓝)
-                const colorIntensity = Math.max(-1, Math.min(1, currentEnergy / 1.5));
-                const r = Math.round(255);
-                const g = Math.round(220 - 70 * colorIntensity);
-                const b = Math.round(120 + 100 * (1 - Math.abs(colorIntensity)));
-                ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
-                ctx.fill();
-                // 内亮点
-                ctx.shadowBlur = 10;
-                ctx.beginPath();
-                ctx.arc(testCharge.x-5, testCharge.y-5, 7, 0, Math.PI*2);
-                ctx.fillStyle = '#fff9e6';
-                ctx.fill();
-
-                // 绘制试探电荷的电荷量标记
-                ctx.shadowBlur = 0;
-                ctx.font = 'bold 15px "Segoe UI", sans-serif';
-                ctx.fillStyle = '#1e1e1e';
-                ctx.shadowColor = '#ffffff';
-                ctx.shadowBlur = 10;
-                ctx.fillText('+1.0C', testCharge.x - 28, testCharge.y - 28);
-
-                // 绘制坐标轴刻度(简单)
-                ctx.shadowBlur = 0;
-                ctx.font = '12px monospace';
-                ctx.fillStyle = '#a0c0d0';
-                ctx.fillText('⚡ 电场区域', 20, 35);
-            }
-
-            // 更新所有UI（电势能显示 + 重绘）
-            function updateGame() {
-                updateEnergyDisplay();
-                draw();
-            }
-
-            // 重置小球到默认位置 (同时重置拖动状态)
-            function resetGame() {
-                testCharge.x = 360;
-                testCharge.y = 250;
-                isDragging = false;
-                updateGame();
-            }
-
-            // 获取鼠标在canvas内的坐标
-            function getMousePos(e) {
-                const rect = canvas.getBoundingClientRect();
-                const scaleX = canvas.width / rect.width;   // canvas物理像素比
-                const scaleY = canvas.height / rect.height;
-                return {
-                    x: (e.clientX - rect.left) * scaleX,
-                    y: (e.clientY - rect.top) * scaleY
-                };
-            }
-
-            // 检查点是否在试探电荷内
-            function isPointInTestCharge(px, py) {
-                const dx = px - testCharge.x;
-                const dy = py - testCharge.y;
-                const dist = Math.sqrt(dx*dx + dy*dy);
-                return dist <= testCharge.radius + 8; // 增加一点拾取半径，更友好
-            }
-
-            // ---- 鼠标事件 ----
-            function onMouseDown(e) {
-                e.preventDefault();
-                const { x, y } = getMousePos(e);
-                if (isPointInTestCharge(x, y)) {
-                    isDragging = true;
-                    // 防止拖动时选中文本
-                    canvas.style.cursor = 'grabbing';
-                }
-            }
-
-            function onMouseMove(e) {
-                e.preventDefault();
-                const { x, y } = getMousePos(e);
-                mouseInside = true;
-
-                if (isDragging) {
-                    // 边界限制，不要跑出画布太远，保留一点边缘
-                    const margin = testCharge.radius + 2;
-                    testCharge.x = Math.min(canvas.width - margin, Math.max(margin, x));
-                    testCharge.y = Math.min(canvas.height - margin, Math.max(margin, y));
-                    updateGame();
-                } else {
-                    // 可选：悬停效果，不拖动时改变光标
-                    if (isPointInTestCharge(x, y)) {
-                        canvas.style.cursor = 'grab';
-                    } else {
-                        canvas.style.cursor = 'crosshair';
-                    }
-                }
-            }
-
-            function onMouseUp(e) {
-                e.preventDefault();
-                if (isDragging) {
-                    isDragging = false;
-                    canvas.style.cursor = 'grab';
-                    // 不重置位置，只停止拖动；但可更新
-                    updateGame();
-                }
-            }
-
-            function onMouseLeave(e) {
-                // 如果鼠标离开画布，停止拖动（防止卡住）
-                if (isDragging) {
-                    isDragging = false;
-                    canvas.style.cursor = 'crosshair';
-                }
-                mouseInside = false;
-            }
-
-            // 点击重置按钮
-            document.getElementById('resetButton').addEventListener('click', resetGame);
-
-            // 初始化时计算电势能并绘制
-            updateGame();
-
-            // 注册事件监听
-            canvas.addEventListener('mousedown', onMouseDown);
-            canvas.addEventListener('mousemove', onMouseMove);
-            canvas.addEventListener('mouseup', onMouseUp);
-            canvas.addEventListener('mouseleave', onMouseLeave);
-            // 防止在canvas外松开鼠标导致拖动状态残留
-            window.addEventListener('mouseup', onMouseUp);
-
-            // 可选：显示初始电荷量
-            chargeSpan.textContent = testCharge.q.toFixed(1);
-
-            // 额外展示：在电荷量旁边加个固定电荷总量提示？（不做，但电荷量就显示试探电荷）
-            // 对于试探电荷的q固定为1.0C，也可以改成滑块，但游戏核心是移动。
-
-            // 增加触摸支持（简单移动端适配）
-            canvas.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                const touch = e.touches[0];
-                const mouseEvent = new MouseEvent('mousedown', {
-                    clientX: touch.clientX,
-                    clientY: touch.clientY,
+            const topY = margin;
+            const botY = H - margin;
+            const charges = [];
+            xs.forEach(x => charges.push({ x, y: topY, sign: 1 }));
+            xs.forEach(x => charges.push({ x, y: botY, sign: -1 }));
+            return charges;
+        },
+    },
+    {   // 3: 六角环
+        name: '六角环',
+        desc: '正负电荷交替在六边形顶点',
+        initFixed: () => {
+            const S = Math.min(W, H);
+            const cx = W / 2, cy = H / 2;
+            const R = S * 0.32;
+            const charges = [];
+            for (let i = 0; i < 6; i++) {
+                const a = (i / 6) * Math.PI * 2 - Math.PI / 2;
+                charges.push({
+                    x: cx + R * Math.cos(a),
+                    y: cy + R * Math.sin(a),
+                    sign: i % 2 === 0 ? 1 : -1,
                 });
-                canvas.dispatchEvent(mouseEvent);
-            }, { passive: false });
+            }
+            return charges;
+        },
+    },
+    {   // 4: 偶极子
+        name: '偶极子',
+        desc: '正负电荷靠得很近',
+        initFixed: () => {
+            const S = Math.min(W, H);
+            const cx = W / 2, cy = H / 2;
+            const d = S * 0.12;
+            return [
+                { x: cx - d, y: cy, sign: 1 },
+                { x: cx + d, y: cy, sign: -1 },
+            ];
+        },
+    },
+];
 
-            canvas.addEventListener('touchmove', (e) => {
-                e.preventDefault();
-                const touch = e.touches[0];
-                const mouseEvent = new MouseEvent('mousemove', {
-                    clientX: touch.clientX,
-                    clientY: touch.clientY,
-                });
-                canvas.dispatchEvent(mouseEvent);
-            }, { passive: false });
+// ============================================================
+//  放置固定电荷（含硬壳，不可穿透）
+// ============================================================
+function placeFixedCharges() {
+    const S = Math.min(W, H);
+    const fixedR = clamp(S * 0.026, 13, 22);
+    const shellR = fixedR * 1.40;   // 硬壳半径，保证试验电荷无法重叠
 
-            canvas.addEventListener('touchend', (e) => {
-                e.preventDefault();
-                const mouseEvent = new MouseEvent('mouseup', {});
-                canvas.dispatchEvent(mouseEvent);
-            }, { passive: false });
+    const raw = MODELS[state.modelIndex].initFixed();
+    return raw.map(c => ({
+        x: c.x,
+        y: c.y,
+        r: fixedR,
+        shellR: shellR,
+        sign: c.sign,
+        pulse: 0,
+    }));
+}
 
-            // 触摸取消
-            canvas.addEventListener('touchcancel', (e) => {
-                e.preventDefault();
-                if (isDragging) {
-                    isDragging = false;
-                    canvas.style.cursor = 'crosshair';
+// ============================================================
+//  开一局新游戏
+// ============================================================
+function newGame() {
+    state.flipped = 0;
+    state.elapsed = 0;
+    state.phase   = 'playing';
+    state.trail   = [];
+
+    const S = Math.min(W, H);
+    const margin = Math.max(50, S * 0.12);
+
+    // 先放置固定电荷，用于后续避让
+    state.fixed = placeFixedCharges();
+
+    // 放置试验电荷（避开固定电荷的硬壳）
+    const testR = clamp(S * 0.020, 10, 16);
+    let testPos = null;
+    for (let attempt = 0; attempt < 300; attempt++) {
+        const x = rnd(margin, W - margin);
+        const y = rnd(margin, H - margin);
+        let ok = true;
+        for (const c of state.fixed) {
+            if (dist(x, y, c.x, c.y) < c.shellR + testR + 16) { ok = false; break; }
+        }
+        if (ok) { testPos = { x, y }; break; }
+    }
+    if (!testPos) testPos = { x: W / 2, y: H / 2 };
+    state.test = { x: testPos.x, y: testPos.y, vx: 0, vy: 0, r: testR };
+
+    // 放置目标区域（尽量远离固定电荷）
+    const goalR = clamp(S * 0.065, 32, 50);
+    let goalPos = null;
+    for (let attempt = 0; attempt < 300; attempt++) {
+        const x = rnd(margin + goalR, W - margin - goalR);
+        const y = rnd(margin + goalR, H - margin - goalR);
+        if (dist(x, y, state.test.x, state.test.y) < goalR * 2.2) continue;
+        let ok = true;
+        for (const c of state.fixed) {
+            if (dist(x, y, c.x, c.y) < c.shellR + goalR + 16) { ok = false; break; }
+        }
+        if (ok) { goalPos = { x, y }; break; }
+    }
+    if (!goalPos) goalPos = { x: W * 0.75, y: H * 0.75 };
+    state.goal = { x: goalPos.x, y: goalPos.y, r: goalR };
+}
+
+// ============================================================
+//  电势能计算（用于 HUD 显示）
+// ============================================================
+function calcPotentialEnergy() {
+    const t = state.test;
+    if (!t) return 0;
+    let U = 0;
+    for (const c of state.fixed) {
+        const d = Math.max(dist(t.x, t.y, c.x, c.y), SOFT);
+        U += (c.sign * Q_FIXED * 1.0) / d;   // 试探电荷 +1.0C
+    }
+    return U;
+}
+
+// ============================================================
+//  逻辑更新
+// ============================================================
+function update(dt) {
+    for (let i = 0; i < state.fixed.length; i++) {
+        const c = state.fixed[i];
+        if (c.pulse > 0) c.pulse = Math.max(0, c.pulse - dt * 4);
+    }
+
+    if (state.phase !== 'playing') return;
+
+    state.elapsed += dt;
+
+    const t = state.test;
+    let fx = 0, fy = 0;
+
+    // 库仑力（只来自固定电荷）
+    for (let i = 0; i < state.fixed.length; i++) {
+        const c = state.fixed[i];
+        const q = c.sign * Q_FIXED;
+        const dx = t.x - c.x, dy = t.y - c.y;
+        const d2 = dx * dx + dy * dy + SOFT * SOFT;
+        const r = Math.sqrt(d2);
+        const k = q / (d2 * r) * (1 + r * FAR_BOOST);
+        fx += k * dx;
+        fy += k * dy;
+    }
+
+    // 过阻尼积分
+    t.vx += (fx - DRAG * t.vx) / MASS * dt;
+    t.vy += (fy - DRAG * t.vy) / MASS * dt;
+
+    const sp = Math.hypot(t.vx, t.vy);
+    if (sp > MAX_SPEED) {
+        t.vx = t.vx / sp * MAX_SPEED;
+        t.vy = t.vy / sp * MAX_SPEED;
+    }
+
+    const px = t.x, py = t.y;
+    t.x += t.vx * dt;
+    t.y += t.vy * dt;
+
+    // 边界反弹
+    const pad = t.r + 2;
+    if (t.x < pad)          { t.x = pad;     t.vx = Math.abs(t.vx) * 0.5; }
+    else if (t.x > W - pad) { t.x = W - pad; t.vx = -Math.abs(t.vx) * 0.5; }
+    if (t.y < pad)          { t.y = pad;     t.vy = Math.abs(t.vy) * 0.5; }
+    else if (t.y > H - pad) { t.y = H - pad; t.vy = -Math.abs(t.vy) * 0.5; }
+
+    // 硬壳碰撞：推出到壳外，保留切向速度
+    for (let i = 0; i < state.fixed.length; i++) {
+        const c = state.fixed[i];
+        const dx = t.x - c.x, dy = t.y - c.y;
+        let d = Math.hypot(dx, dy);
+        const minD = c.shellR + t.r;
+
+        if (d < minD) {
+            if (d < 0.001) {
+                t.x = c.x + minD;
+                t.y = c.y;
+                t.vx = 0;
+                t.vy = 0;
+            } else {
+                const nx = dx / d, ny = dy / d;
+                t.x = c.x + nx * minD;
+                t.y = c.y + ny * minD;
+                const vn = t.vx * nx + t.vy * ny;
+                if (vn < 0) {
+                    t.vx -= vn * nx;
+                    t.vy -= vn * ny;
                 }
-            }, { passive: false });
+            }
+        }
+    }
 
-        })();
-    </script>
+    // 轨迹
+    if (Math.hypot(t.x - px, t.y - py) > 1.8) {
+        state.trail.push({ x: t.x, y: t.y });
+        if (state.trail.length > 60) state.trail.shift();
+    }
+
+    // 到达目标
+    const gd = dist(t.x, t.y, state.goal.x, state.goal.y);
+    if (gd < state.goal.r) {
+        state.phase = 'won';
+        state.winAt = performance.now();
+    }
+}
+
+// ============================================================
+//  渲染
+// ============================================================
+function render() {
+    const now = performance.now();
+
+    ctx.fillStyle = '#0f0f1a';
+    ctx.fillRect(0, 0, W, H);
+
+    // 背景网格（淡）
+    ctx.save();
+    ctx.strokeStyle = '#1a1a2e';
+    ctx.lineWidth = 0.6;
+    ctx.globalAlpha = 0.35;
+    const gridSize = 50;
+    for (let x = 0; x <= W; x += gridSize) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+    for (let y = 0; y <= H; y += gridSize) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+    ctx.restore();
+
+    drawGoal(now);
+    drawTrail();
+    drawFixedCharges(now);
+    drawTestCharge();
+    drawHUD();
+    drawResetButton();
+
+    if (state.phase === 'won') drawWinOverlay();
+}
+
+// ---- 目标区域 ----
+function drawGoal(now) {
+    const g = state.goal;
+    if (!g) return;
+    const pulse = 1 + Math.sin(now / 420) * 0.045;
+    const R = g.r * pulse;
+
+    const grad = ctx.createRadialGradient(g.x, g.y, 0, g.x, g.y, R);
+    grad.addColorStop(0,   'rgba(46, 213, 115, 0.16)');
+    grad.addColorStop(0.7, 'rgba(46, 213, 115, 0.06)');
+    grad.addColorStop(1,   'rgba(46, 213, 115, 0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(g.x, g.y, R, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.save();
+    ctx.setLineDash([9, 9]);
+    ctx.lineDashOffset = -now / 60;
+    ctx.strokeStyle = 'rgba(46, 213, 115, 0.75)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(g.x, g.y, R, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.strokeStyle = 'rgba(46, 213, 115, 0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(g.x - 8, g.y); ctx.lineTo(g.x + 8, g.y);
+    ctx.moveTo(g.x, g.y - 8); ctx.lineTo(g.x, g.y + 8);
+    ctx.stroke();
+}
+
+// ---- 试验电荷轨迹 ----
+function drawTrail() {
+    const tr = state.trail;
+    if (tr.length < 2) return;
+
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (let i = 1; i < tr.length; i++) {
+        const a = (i / tr.length) * 0.30;
+        ctx.strokeStyle = 'rgba(46, 213, 115, ' + a + ')';
+        ctx.lineWidth = 1 + (i / tr.length) * 2.2;
+        ctx.beginPath();
+        ctx.moveTo(tr[i - 1].x, tr[i - 1].y);
+        ctx.lineTo(tr[i].x, tr[i].y);
+        ctx.stroke();
+    }
+    ctx.restore();
+}
+
+// ---- 固定电荷（含硬壳）----
+function drawFixedCharges(now) {
+    for (let i = 0; i < state.fixed.length; i++) {
+        const c = state.fixed[i];
+        const isPos = c.sign > 0;
+        const rgb = isPos ? '255, 92, 108' : '77, 124, 255';
+        const R = c.r * (1 + c.pulse * 0.45);
+
+        // 硬壳（虚线圆环）
+        ctx.save();
+        ctx.setLineDash([5, 5]);
+        ctx.lineDashOffset = -now / 80;
+        ctx.strokeStyle = 'rgba(' + rgb + ', 0.50)';
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, c.shellR, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+
+        // 壳内微弱氛围
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, c.shellR, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(' + rgb + ', 0.05)';
+        ctx.fill();
+
+        // 外发光
+        const g = ctx.createRadialGradient(c.x, c.y, R * 0.5, c.x, c.y, R * 2.8);
+        g.addColorStop(0, 'rgba(' + rgb + ', ' + (0.28 + c.pulse * 0.30) + ')');
+        g.addColorStop(1, 'rgba(' + rgb + ', 0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, R * 2.8, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 主体
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, R, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgb(' + rgb + ')';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // 正负号
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2.8;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(c.x - R * 0.38, c.y);
+        ctx.lineTo(c.x + R * 0.38, c.y);
+        if (isPos) {
+            ctx.moveTo(c.x, c.y - R * 0.38);
+            ctx.lineTo(c.x, c.y + R * 0.38);
+        }
+        ctx.stroke();
+    }
+}
+
+// ---- 试验电荷 ----
+function drawTestCharge() {
+    const t = state.test;
+    if (!t) return;
+
+    // 根据电势能调整颜色微调（高能偏红，低能偏蓝）
+    const U = calcPotentialEnergy();
+    const intensity = clamp(U / 2e6, -1, 1);
+    const r = Math.round(46 + 80 * Math.max(0, intensity));
+    const g = Math.round(213 - 50 * Math.abs(intensity));
+    const b = Math.round(115 + 100 * Math.max(0, -intensity));
+
+    ctx.save();
+    ctx.shadowColor = `rgb(${r}, ${g}, ${b})`;
+    ctx.shadowBlur = 22 + 18 * Math.abs(intensity);
+
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, t.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+    ctx.fill();
+    ctx.restore();
+
+    ctx.strokeStyle = '#0f0f1a';
+    ctx.lineWidth = 2.4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(t.x - 4.5, t.y); ctx.lineTo(t.x + 4.5, t.y);
+    ctx.moveTo(t.x, t.y - 4.5); ctx.lineTo(t.x, t.y + 4.5);
+    ctx.stroke();
+}
+
+// ---- HUD ----
+function drawHUD() {
+    ctx.save();
+    ctx.font = '600 14px system-ui, sans-serif';
+
+    // 左上：模型名称
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(160, 200, 255, 0.85)';
+    ctx.fillText('⚡ ' + MODELS[state.modelIndex].name, 18, 30);
+
+    // 左上：电势能
+    const U = calcPotentialEnergy();
+    ctx.fillStyle = 'rgba(255, 220, 120, 0.9)';
+    ctx.font = '700 16px system-ui, sans-serif';
+    ctx.fillText('U = ' + U.toFixed(2) + ' J', 18, 56);
+
+    // 右上：计时 + 翻转次数
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+    ctx.font = '600 14px system-ui, sans-serif';
+    ctx.fillText(state.elapsed.toFixed(1) + ' s', W - 18, 30);
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.fillText('翻转 ' + state.flipped, W - 18, 56);
+
+    // 顶部中央：模型描述
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(200, 220, 255, 0.40)';
+    ctx.font = '400 13px system-ui, sans-serif';
+    ctx.fillText(MODELS[state.modelIndex].desc, W / 2, 30);
+
+    ctx.restore();
+}
+
+// ---- 重开按钮 ----
+function drawResetButton() {
+    const bx = W - 36, by = H - 36, br = 18;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(bx, by, br, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.07)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(bx, by, 7, 0.7, 5.4);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(bx + 5, by - 8);
+    ctx.lineTo(bx + 8, by - 2);
+    ctx.lineTo(bx + 1, by - 2);
+    ctx.stroke();
+    ctx.restore();
+}
+
+// ---- 胜利遮罩 ----
+function drawWinOverlay() {
+    ctx.fillStyle = 'rgba(8, 10, 20, 0.78)';
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.textAlign = 'center';
+
+    ctx.fillStyle = '#2ed573';
+    ctx.font = '700 32px system-ui, sans-serif';
+    ctx.fillText('电荷已抵达目标', W / 2, H / 2 - 34);
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.font = '400 17px system-ui, sans-serif';
+    ctx.fillText('用时 ' + state.elapsed.toFixed(1) + ' 秒 · 翻转 ' + state.flipped + ' 次', W / 2, H / 2 + 10);
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.font = '400 14px system-ui, sans-serif';
+    ctx.fillText('点击屏幕 / 按 R 键  ·  开始新的一局', W / 2, H / 2 + 54);
+
+    // 切换模型按钮提示
+    ctx.fillStyle = 'rgba(160, 200, 255, 0.50)';
+    ctx.font = '400 13px system-ui, sans-serif';
+    ctx.fillText('← 顶部点击切换模型 →', W / 2, H - 40);
+}
+
+// ============================================================
+//  输入
+// ============================================================
+canvas.addEventListener('pointerdown', function (e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    // 右下角重开按钮
+    if (dist(x, y, W - 36, H - 36) < 28) {
+        newGame();
+        return;
+    }
+
+    if (state.phase === 'won') {
+        if (performance.now() - state.winAt > 400) newGame();
+        return;
+    }
+
+    // 点击固定电荷 → 翻转符号
+    for (let i = state.fixed.length - 1; i >= 0; i--) {
+        const c = state.fixed[i];
+        if (dist(x, y, c.x, c.y) < c.shellR + 12) {
+            c.sign *= -1;
+            c.pulse = 1;
+            state.flipped++;
+            return;
+        }
+    }
+});
+
+// 键盘：R 重开，1-5 切换模型
+window.addEventListener('keydown', function (e) {
+    if (e.code === 'KeyR') {
+        newGame();
+    } else if (e.code === 'Space' && state.phase === 'won') {
+        e.preventDefault();
+        newGame();
+    } else if (e.code === 'Digit1' || e.code === 'Numpad1') {
+        state.modelIndex = 0; newGame();
+    } else if (e.code === 'Digit2' || e.code === 'Numpad2') {
+        state.modelIndex = 1; newGame();
+    } else if (e.code === 'Digit3' || e.code === 'Numpad3') {
+        state.modelIndex = 2; newGame();
+    } else if (e.code === 'Digit4' || e.code === 'Numpad4') {
+        state.modelIndex = 3; newGame();
+    } else if (e.code === 'Digit5' || e.code === 'Numpad5') {
+        state.modelIndex = 4; newGame();
+    }
+});
+
+// ============================================================
+//  窗口尺寸变化
+// ============================================================
+let resizeTimer = 0;
+window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () {
+        resize();
+        newGame();
+    }, 180);
+});
+
+// ============================================================
+//  主循环
+// ============================================================
+let lastTime = 0;
+
+function loop(now) {
+    if (!lastTime) lastTime = now;
+    const dt = Math.min((now - lastTime) / 1000, 0.05);
+    lastTime = now;
+
+    update(dt);
+    render();
+
+    requestAnimationFrame(loop);
+}
+
+// ============================================================
+//  启动
+// ============================================================
+resize();
+newGame();
+requestAnimationFrame(loop);
+
+})();
+</script>
 </body>
 </html>
