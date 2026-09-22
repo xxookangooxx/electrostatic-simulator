@@ -55,7 +55,6 @@
             font-size: 10px; color: #4a7a92;
             margin-left: 3px; font-weight: 600;
         }
-        /* 电势能颜色随区间变化，但变化频率降低 */
         .stat.energy .stat-value { color: #ffd966; text-shadow: 0 0 14px rgba(255, 217, 102, 0.5); }
         .stat.energy.pos .stat-value { color: #ff8a8a; text-shadow: 0 0 14px rgba(255, 100, 100, 0.5); }
         .stat.energy.neg .stat-value { color: #7ab8ff; text-shadow: 0 0 14px rgba(100, 150, 255, 0.5); }
@@ -104,7 +103,7 @@
         #toast.success { border-color: #2ed573; color: #b0ffc8; box-shadow: 0 0 18px rgba(46,213,115,0.4); }
         #toast.warn { border-color: #ffa502; color: #ffe0a0; box-shadow: 0 0 18px rgba(255,165,2,0.4); }
 
-        /* ===== 菜单按钮 ===== */
+        /* ===== 游戏内菜单按钮 ===== */
         #menuBtn {
             position: fixed; top: 16px; right: 16px;
             width: 42px; height: 42px;
@@ -118,50 +117,64 @@
             z-index: 50;
             transition: all 0.2s ease;
             pointer-events: auto;
+            opacity: 0; visibility: hidden;
         }
+        #menuBtn.visible { opacity: 1; visibility: visible; }
         #menuBtn:hover {
             background: rgba(35, 70, 95, 0.95);
             border-color: #6ad4ff;
             color: #ffffff;
         }
 
-        /* ===== 菜单 ===== */
-        #menu {
+        /* ===== 开始界面 ===== */
+        #startScreen {
             position: fixed; inset: 0;
-            background: rgba(6, 10, 18, 0.94);
-            backdrop-filter: blur(10px);
+            background: radial-gradient(ellipse at center, #0f1e2e 0%, #060a10 100%);
             display: flex; flex-direction: column;
             justify-content: center; align-items: center;
-            z-index: 100;
-            transition: opacity 0.4s ease, visibility 0.4s;
-            overflow-y: auto; padding: 40px 20px;
+            z-index: 200;
+            transition: opacity 0.5s ease, visibility 0.5s;
+            overflow-y: auto; padding: 30px 20px;
         }
-        #menu.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
-        .menu-title {
-            color: #a8d8ff; font-size: 32px; font-weight: 800;
-            margin-bottom: 6px; letter-spacing: 3px;
-            text-shadow: 0 0 24px rgba(100, 180, 255, 0.5);
+        #startScreen.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+
+        .start-logo {
+            font-size: 48px; font-weight: 900;
+            color: #a8d8ff;
+            letter-spacing: 6px;
+            text-shadow: 0 0 30px rgba(100, 180, 255, 0.6), 0 0 60px rgba(100, 180, 255, 0.3);
+            margin-bottom: 8px;
+            animation: logoFloat 3s ease-in-out infinite;
         }
-        .menu-subtitle {
-            color: #5e8fa8; font-size: 14px; margin-bottom: 32px;
-            letter-spacing: 1px;
+        @keyframes logoFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
         }
-        .menu-section { margin-bottom: 24px; text-align: center; }
-        .menu-label {
-            color: #6b9fc0; font-size: 12px; letter-spacing: 2px;
+        .start-sub {
+            color: #5e8fa8; font-size: 15px;
+            letter-spacing: 4px; margin-bottom: 40px;
+            text-transform: uppercase;
+        }
+
+        .start-grid {
+            display: grid; gap: 10px;
+            max-width: 760px; width: 100%;
+            margin-bottom: 28px;
+        }
+        .start-grid.model-grid { grid-template-columns: repeat(5, 1fr); }
+        .start-grid.mode-grid { grid-template-columns: repeat(3, 1fr); }
+
+        .start-label {
+            color: #6b9fc0; font-size: 12px; letter-spacing: 2.5px;
             margin-bottom: 12px; text-transform: uppercase;
+            text-align: center; font-weight: 600;
         }
-        .menu-grid {
-            display: grid; gap: 8px;
-            max-width: 720px; padding: 0 20px;
-        }
-        .menu-grid.model-grid { grid-template-columns: repeat(5, 1fr); }
-        .menu-grid.mode-grid { grid-template-columns: repeat(3, 1fr); }
-        .menu-item {
+
+        .start-item {
             background: rgba(20, 40, 55, 0.7);
             border: 1.5px solid #2d5a6e;
             color: #8fc4dd;
-            padding: 12px 8px;
+            padding: 14px 8px;
             border-radius: 14px;
             cursor: pointer;
             transition: all 0.2s ease;
@@ -171,58 +184,105 @@
             line-height: 1.4;
             min-width: 90px;
         }
-        .menu-item:hover {
+        .start-item:hover {
             background: rgba(35, 70, 95, 0.9);
             border-color: #5aa8cc;
             color: #d4f0ff;
             transform: translateY(-2px);
         }
-        .menu-item.selected {
+        .start-item.selected {
             background: rgba(45, 110, 150, 0.85);
             border-color: #6ad4ff;
             color: #ffffff;
-            box-shadow: 0 0 18px rgba(106, 212, 255, 0.4);
+            box-shadow: 0 0 20px rgba(106, 212, 255, 0.5);
         }
-        .menu-item .item-icon { font-size: 18px; display: block; margin-bottom: 4px; }
-        .menu-item .item-desc { font-size: 10px; color: #6b9fc0; font-weight: 400; margin-top: 3px; display: block; }
-        .menu-item.selected .item-desc { color: #b0e0ff; }
-        .start-btn {
-            margin-top: 20px;
+        .start-item .item-icon { font-size: 22px; display: block; margin-bottom: 5px; }
+        .start-item .item-desc {
+            font-size: 10px; color: #6b9fc0;
+            font-weight: 400; margin-top: 3px; display: block;
+        }
+        .start-item.selected .item-desc { color: #b0e0ff; }
+
+        .start-play {
+            margin-top: 8px;
             background: linear-gradient(135deg, #1e6b8c, #2d8fb5);
             border: 2px solid #6ad4ff;
             color: #ffffff;
-            padding: 14px 64px;
-            border-radius: 40px;
-            font-size: 18px; font-weight: 800;
-            letter-spacing: 4px; cursor: pointer;
-            box-shadow: 0 8px 24px rgba(45, 143, 181, 0.5), 0 0 30px rgba(106, 212, 255, 0.3);
+            padding: 16px 80px;
+            border-radius: 50px;
+            font-size: 20px; font-weight: 900;
+            letter-spacing: 6px; cursor: pointer;
+            box-shadow: 0 8px 28px rgba(45, 143, 181, 0.6), 0 0 40px rgba(106, 212, 255, 0.4);
             transition: all 0.2s ease;
+            animation: playPulse 2s ease-in-out infinite;
         }
-        .start-btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 12px 32px rgba(45, 143, 181, 0.7), 0 0 40px rgba(106, 212, 255, 0.5);
+        @keyframes playPulse {
+            0%, 100% { box-shadow: 0 8px 28px rgba(45, 143, 181, 0.6), 0 0 40px rgba(106, 212, 255, 0.4); }
+            50% { box-shadow: 0 8px 28px rgba(45, 143, 181, 0.8), 0 0 60px rgba(106, 212, 255, 0.7); }
         }
-        .start-btn:active { transform: translateY(0); }
+        .start-play:hover {
+            transform: translateY(-3px) scale(1.03);
+        }
+        .start-play:active { transform: translateY(0) scale(1); }
 
-        /* ===== 悬浮数值面板（跟随小球） ===== */
-        #floatPanel {
-            position: fixed;
-            background: rgba(10, 20, 30, 0.88);
-            border: 1px solid #3d7186;
-            border-radius: 10px;
-            padding: 6px 10px;
-            color: #a8d8ff;
-            font-size: 11px;
-            pointer-events: none;
-            z-index: 15;
-            opacity: 0;
-            transition: opacity 0.25s;
-            font-weight: 600;
-            letter-spacing: 0.3px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        .start-help {
+            margin-top: 32px;
+            display: flex; gap: 28px; flex-wrap: wrap;
+            justify-content: center;
+            color: #5e8fa8; font-size: 12px;
+            letter-spacing: 0.5px;
         }
-        #floatPanel.show { opacity: 1; }
-        #floatPanel .val { color: #ffd966; font-weight: 800; }
+        .start-help kbd {
+            background: rgba(45, 110, 150, 0.5);
+            border: 1px solid #3d7186;
+            border-radius: 6px;
+            padding: 2px 8px;
+            font-family: monospace;
+            color: #b0e0ff;
+            font-weight: 700;
+            margin-right: 4px;
+        }
+
+        /* ===== 暂停/菜单界面 ===== */
+        #pauseScreen {
+            position: fixed; inset: 0;
+            background: rgba(6, 10, 18, 0.92);
+            backdrop-filter: blur(8px);
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            z-index: 150;
+            transition: opacity 0.3s ease, visibility 0.3s;
+        }
+        #pauseScreen.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+        .pause-title {
+            color: #a8d8ff; font-size: 28px; font-weight: 800;
+            letter-spacing: 4px; margin-bottom: 30px;
+            text-shadow: 0 0 20px rgba(100, 180, 255, 0.5);
+        }
+        .pause-btn {
+            background: rgba(20, 40, 55, 0.9);
+            border: 1.5px solid #3d7186;
+            color: #8fc4dd;
+            padding: 14px 48px;
+            border-radius: 40px;
+            font-size: 16px; font-weight: 700;
+            letter-spacing: 2px; cursor: pointer;
+            margin-bottom: 12px;
+            transition: all 0.2s ease;
+            min-width: 220px;
+        }
+        .pause-btn:hover {
+            background: rgba(45, 110, 150, 0.9);
+            border-color: #6ad4ff;
+            color: #ffffff;
+            transform: translateY(-2px);
+            box-shadow: 0 0 20px rgba(106, 212, 255, 0.4);
+        }
+        .pause-btn.primary {
+            background: linear-gradient(135deg, #1e6b8c, #2d8fb5);
+            border-color: #6ad4ff;
+            color: #ffffff;
+        }
     </style>
 </head>
 <body>
@@ -257,49 +317,55 @@
     <div class="energy-bar" id="energyBar"></div>
 </div>
 
-<!-- 悬浮数值 -->
-<div id="floatPanel">
-    U = <span class="val" id="floatEnergy">0.00</span> J
-</div>
-
 <!-- 提示 -->
 <div id="toast"></div>
 
 <!-- 菜单按钮 -->
 <button id="menuBtn" title="菜单">☰</button>
 
-<!-- 选择菜单 -->
-<div id="menu">
-    <div class="menu-title">⚡ 电荷引导大师</div>
-    <div class="menu-subtitle">静电场 · 多模型 · 随机事件</div>
+<!-- ===== 开始界面 ===== -->
+<div id="startScreen">
+    <div class="start-logo">⚡ 电荷引导大师</div>
+    <div class="start-sub">静电场 · 多模型 · 随机事件</div>
 
-    <div class="menu-section">
-        <div class="menu-label">选择电场模型</div>
-        <div class="menu-grid model-grid" id="modelGrid"></div>
-    </div>
+    <div class="start-label">选择电场模型</div>
+    <div class="start-grid model-grid" id="startModelGrid"></div>
 
-    <div class="menu-section">
-        <div class="menu-label">选择游戏模式</div>
-        <div class="menu-grid mode-grid" id="modeGrid">
-            <div class="menu-item selected" data-mode="classic">
-                <span class="item-icon">🎯</span>
-                经典模式
-                <span class="item-desc">无限时间 · 通关得分</span>
-            </div>
-            <div class="menu-item" data-mode="timed">
-                <span class="item-icon">⏱</span>
-                限时挑战
-                <span class="item-desc">60 秒内完成</span>
-            </div>
-            <div class="menu-item" data-mode="endless">
-                <span class="item-icon">♾</span>
-                无尽模式
-                <span class="item-desc">连续通关 · 难度递增</span>
-            </div>
+    <div class="start-label" style="margin-top: 20px;">选择游戏模式</div>
+    <div class="start-grid mode-grid" id="startModeGrid">
+        <div class="start-item selected" data-mode="classic">
+            <span class="item-icon">🎯</span>
+            经典模式
+            <span class="item-desc">无限时间 · 通关得分</span>
+        </div>
+        <div class="start-item" data-mode="timed">
+            <span class="item-icon">⏱</span>
+            限时挑战
+            <span class="item-desc">60 秒内完成</span>
+        </div>
+        <div class="start-item" data-mode="endless">
+            <span class="item-icon">♾</span>
+            无尽模式
+            <span class="item-desc">连续通关 · 难度递增</span>
         </div>
     </div>
 
-    <button class="start-btn" id="startBtn">开始游戏</button>
+    <button class="start-play" id="startPlay">开始游戏</button>
+
+    <div class="start-help">
+        <span><kbd>空格</kbd> 暂停 / 继续</span>
+        <span><kbd>R</kbd> 重新开始</span>
+        <span><kbd>M</kbd> 菜单</span>
+        <span><kbd>1-9</kbd> 快速切换模型</span>
+    </div>
+</div>
+
+<!-- ===== 暂停/菜单界面 ===== -->
+<div id="pauseScreen" class="hidden">
+    <div class="pause-title">⏸ 已暂停</div>
+    <button class="pause-btn primary" id="resumeBtn">继续游戏</button>
+    <button class="pause-btn" id="restartBtn">重新开始</button>
+    <button class="pause-btn" id="backToMenuBtn">返回主菜单</button>
 </div>
 
 <script>
@@ -315,148 +381,79 @@ const clamp = (v, a, b) => v < a ? a : (v > b ? b : v);
 const dist  = (x1, y1, x2, y2) => Math.hypot(x1 - x2, y1 - y2);
 
 // ============================================================
-//  【核心优化】数值显示 —— 低频更新 + 迟滞 + 步进显示
+//  数值显示 —— 低频更新 + 迟滞 + 步进
 // ============================================================
 const NUM_CONFIG = {
-    energy: {
-        decimals: 2,
-        // 每 0.4 秒才更新一次显示值（降低闪烁）
-        updateInterval: 0.40,
-        // 变化量小于此值不更新（避免微小抖动）
-        deadZone: 0.005,
-        // 显示值变化速度（越大越快接近目标）
-        lerp: 8.0,
-    },
-    time: {
-        decimals: 1,
-        updateInterval: 0.2,
-        deadZone: 0.05,
-        lerp: 10.0,
-    },
-    collect: {
-        decimals: 0,
-        updateInterval: 0,
-        deadZone: 0,
-        lerp: 1.0,
-    },
-    flip: {
-        decimals: 0,
-        updateInterval: 0,
-        deadZone: 0,
-        lerp: 1.0,
-    },
+    energy:   { decimals: 2, updateInterval: 0.40, deadZone: 0.005, lerp: 8.0 },
+    time:     { decimals: 1, updateInterval: 0.20, deadZone: 0.05,  lerp: 10.0 },
+    collect:  { decimals: 0, updateInterval: 0,    deadZone: 0,     lerp: 1.0 },
+    flip:     { decimals: 0, updateInterval: 0,    deadZone: 0,     lerp: 1.0 },
 };
 
 const display = {
-    energy:    { el: document.getElementById('energyVal'),      current: 0, target: 0, timer: 0, decimals: 2 },
-    time:      { el: document.getElementById('timeVal'),        current: 0, target: 0, timer: 0, decimals: 1 },
-    collect:   { el: document.getElementById('collectVal'),     current: 0, target: 0, timer: 0, decimals: 0 },
-    flip:      { el: document.getElementById('flipVal'),        current: 0, target: 0, timer: 0, decimals: 0 },
-    floatEnergy: { el: document.getElementById('floatEnergy'),  current: 0, target: 0, timer: 0, decimals: 2 },
+    energy:     { el: document.getElementById('energyVal'),     current: 0, target: 0, timer: 0 },
+    time:       { el: document.getElementById('timeVal'),       current: 0, target: 0, timer: 0 },
+    collect:    { el: document.getElementById('collectVal'),    current: 0, target: 0, timer: 0 },
+    flip:       { el: document.getElementById('flipVal'),       current: 0, target: 0, timer: 0 },
 };
 
-// 更新显示（在主循环中调用）
 function updateDisplayValues(dt) {
     for (const key in display) {
         const d = display[key];
-        const cfg = NUM_CONFIG[key] || NUM_CONFIG.energy;
-
-        // 更新计时器
+        const cfg = NUM_CONFIG[key];
         if (cfg.updateInterval > 0) {
             d.timer += dt;
             if (d.timer < cfg.updateInterval) continue;
             d.timer = 0;
         }
-
-        // 死区检查：如果目标与当前差异小，直接跳过
         const diff = d.target - d.current;
         if (Math.abs(diff) < cfg.deadZone) {
-            // 如果差异很小但不为零，直接吸附
             if (Math.abs(diff) > 0.0001) {
                 d.current = d.target;
-                d.el.textContent = d.current.toFixed(cfg.decimals || d.decimals);
+                d.el.textContent = d.current.toFixed(cfg.decimals);
             }
             continue;
         }
-
-        // 平滑逼近
         const smooth = 1 - Math.pow(1 / (1 + cfg.lerp), dt * 60);
         d.current += diff * smooth;
-
-        // 如果非常接近则直接吸附
-        if (Math.abs(d.target - d.current) < cfg.deadZone * 0.5) {
-            d.current = d.target;
-        }
-
-        d.el.textContent = d.current.toFixed(cfg.decimals || d.decimals);
+        if (Math.abs(d.target - d.current) < cfg.deadZone * 0.5) d.current = d.target;
+        d.el.textContent = d.current.toFixed(cfg.decimals);
     }
 }
 
-// 设置电势能目标（低频更新入口）
 function setEnergyDisplay(U) {
-    // 只在变化超过阈值时才更新目标
     if (Math.abs(U - display.energy.target) > 0.01) {
         display.energy.target = U;
-        display.floatEnergy.target = U;
     }
-
-    // 电势能颜色（迟滞区间：>80000 红，<-80000 蓝，其余黄）
     const stat = document.getElementById('statEnergy');
-    const curClass = stat.className;
     let newClass = 'stat energy';
     if (U > 80000) newClass += ' pos';
     else if (U < -80000) newClass += ' neg';
-    if (newClass !== curClass) {
-        // 仅在类别变化时更新DOM，减少重绘
-        stat.className = newClass;
-    }
+    if (stat.className !== newClass) stat.className = newClass;
 
-    // 能量条（低频更新，0.3s 间隔）
-    if (!setEnergyDisplay._lastBarUpdate || performance.now() - setEnergyDisplay._lastBarUpdate > 300) {
-        setEnergyDisplay._lastBarUpdate = performance.now();
+    if (!setEnergyDisplay._lastBar || performance.now() - setEnergyDisplay._lastBar > 300) {
+        setEnergyDisplay._lastBar = performance.now();
         const bar = document.getElementById('energyBar');
         const norm = clamp((U + 2000000) / 4000000, 0, 1);
-        const newWidth = (norm * 100) + '%';
-        if (bar.style.width !== newWidth) {
-            bar.style.width = newWidth;
-        }
-    }
-
-    // 悬浮面板跟随
-    if (state.test) {
-        const fp = document.getElementById('floatPanel');
-        fp.style.left = (state.test.x + 28) + 'px';
-        fp.style.top = (state.test.y - 32) + 'px';
-        if (!fp.classList.contains('show')) fp.classList.add('show');
+        bar.style.width = (norm * 100) + '%';
     }
 }
 
-// 设置计时器显示目标
 function setTimeDisplay(t) {
     display.time.target = t;
-
-    // 计时器颜色（迟滞：10s 黄，5s 红）
     const stat = document.getElementById('statTimer');
-    const curClass = stat.className;
     let newClass = 'stat timer';
     if (state.timeLimit > 0) {
         if (t <= 5) newClass += ' critical';
         else if (t <= 10) newClass += ' warning';
     }
-    if (newClass !== curClass) {
-        stat.className = newClass;
-    }
+    if (stat.className !== newClass) stat.className = newClass;
 }
 
-// 设置收集计数
 function setCollectDisplay(collected, total) {
-    display.collect.target = collected;
     document.getElementById('collectVal').textContent = collected + '/' + total;
 }
-
-// 设置翻转计数
 function setFlipDisplay(count) {
-    display.flip.target = count;
     document.getElementById('flipVal').textContent = count;
 }
 
@@ -549,8 +546,6 @@ const state = {
     dragging: null,
     mouseX: 0, mouseY: 0,
     mouseInCanvas: false,
-    showFieldArrows: true,
-    showHeatmap: false,
     hoverTarget: null,
     paused: false,
     mode: 'classic',
@@ -564,8 +559,8 @@ const state = {
     goalParticles: 3,
     goalsCompleted: 0,
     comboCount: 0,
-    menuOpen: true,
-    lastEnergy: 0,
+    running: false,
+    _warnedGoal: false,
 };
 
 // ============================================================
@@ -804,58 +799,74 @@ const MODELS = [
 ];
 
 // ============================================================
-//  菜单初始化
+//  开始界面初始化
 // ============================================================
-function initMenu() {
-    const modelGrid = document.getElementById('modelGrid');
+function initStartScreen() {
+    const modelGrid = document.getElementById('startModelGrid');
     modelGrid.innerHTML = '';
     MODELS.forEach((m, i) => {
         const el = document.createElement('div');
-        el.className = 'menu-item' + (i === state.modelIndex ? ' selected' : '');
+        el.className = 'start-item' + (i === state.modelIndex ? ' selected' : '');
         el.dataset.index = i;
         el.innerHTML = `<span class="item-icon">${m.icon}</span>${m.name}<span class="item-desc">${m.desc}</span>`;
         el.addEventListener('click', () => {
             sfxClick();
             state.modelIndex = i;
-            document.querySelectorAll('#modelGrid .menu-item').forEach(e => e.classList.remove('selected'));
+            document.querySelectorAll('#startModelGrid .start-item').forEach(e => e.classList.remove('selected'));
             el.classList.add('selected');
         });
         modelGrid.appendChild(el);
     });
 
-    const modeGrid = document.getElementById('modeGrid');
-    modeGrid.querySelectorAll('.menu-item').forEach(el => {
+    document.querySelectorAll('#startModeGrid .start-item').forEach(el => {
         el.addEventListener('click', () => {
             sfxClick();
             state.mode = el.dataset.mode;
-            modeGrid.querySelectorAll('.menu-item').forEach(e => e.classList.remove('selected'));
+            document.querySelectorAll('#startModeGrid .start-item').forEach(e => e.classList.remove('selected'));
             el.classList.add('selected');
         });
     });
 
-    document.getElementById('startBtn').addEventListener('click', () => {
+    document.getElementById('startPlay').addEventListener('click', () => {
         initAudio();
         sfxClick();
-        closeMenu();
-        newGame();
+        startGame();
     });
 }
 
-function openMenu() {
-    state.menuOpen = true;
+function startGame() {
+    document.getElementById('startScreen').classList.add('hidden');
+    document.getElementById('menuBtn').classList.add('visible');
+    state.running = true;
+    newGame();
+}
+
+// ============================================================
+//  暂停界面
+// ============================================================
+function showPause() {
     state.paused = true;
-    document.getElementById('menu').classList.remove('hidden');
+    document.getElementById('pauseScreen').classList.remove('hidden');
+}
+function hidePause() {
+    state.paused = false;
+    document.getElementById('pauseScreen').classList.add('hidden');
 }
 
-function closeMenu() {
-    state.menuOpen = false;
-    document.getElementById('menu').classList.add('hidden');
-}
-
-document.getElementById('menuBtn').addEventListener('click', () => {
+document.getElementById('resumeBtn').addEventListener('click', () => { sfxClick(); hidePause(); });
+document.getElementById('restartBtn').addEventListener('click', () => { sfxClick(); hidePause(); newGame(); });
+document.getElementById('backToMenuBtn').addEventListener('click', () => {
     sfxClick();
-    openMenu();
+    hidePause();
+    state.running = false;
+    document.getElementById('startScreen').classList.remove('hidden');
+    document.getElementById('menuBtn').classList.remove('visible');
+    // 清空画布
+    ctx.fillStyle = '#0a0e14';
+    ctx.fillRect(0, 0, W, H);
 });
+
+document.getElementById('menuBtn').addEventListener('click', () => { sfxClick(); showPause(); });
 
 // ============================================================
 //  放置固定带电体
@@ -897,18 +908,12 @@ function newGame() {
     state.goalsCompleted = 0;
     state.comboCount = 0;
     state.paused = false;
+    state._warnedGoal = false;
 
-    // 重置显示值，避免从上一局残留
-    display.energy.current = 0;
-    display.energy.target = 0;
-    display.time.current = 0;
-    display.time.target = 0;
-    display.collect.current = 0;
-    display.collect.target = 0;
-    display.flip.current = 0;
-    display.flip.target = 0;
-    display.floatEnergy.current = 0;
-    display.floatEnergy.target = 0;
+    display.energy.current = 0; display.energy.target = 0;
+    display.time.current = 0; display.time.target = 0;
+    display.collect.current = 0; display.collect.target = 0;
+    display.flip.current = 0; display.flip.target = 0;
     document.getElementById('energyVal').textContent = '0.00';
     document.getElementById('timeVal').textContent = '0.0';
     document.getElementById('collectVal').textContent = '0/3';
@@ -989,6 +994,7 @@ function newGame() {
             }
         }
     }
+    setCollectDisplay(0, state.collectibles.length);
 }
 
 // ============================================================
@@ -1011,10 +1017,7 @@ function fieldRing(t, c) {
     const k = q / (d2 * r) * (1 + r * FAR_BOOST);
     const radialFactor = d > c.R ? 1.0 : d / c.R;
     const ringPenalty = Math.exp(-Math.abs(d - c.R) / (c.R * 0.3)) * 0.8;
-    return {
-        fx: k * nx * (radialFactor + ringPenalty),
-        fy: k * ny * (radialFactor + ringPenalty),
-    };
+    return { fx: k * nx * (radialFactor + ringPenalty), fy: k * ny * (radialFactor + ringPenalty) };
 }
 
 function fieldDisk(t, c) {
@@ -1034,10 +1037,7 @@ function fieldDisk(t, c) {
     const k = q / (d2 * r) * (1 + r * FAR_BOOST);
     const factor = d > c.R ? 1.0 : -d / c.R * 0.6;
     const diskPenalty = Math.exp(-Math.abs(d - c.R) / (c.R * 0.25)) * 1.0;
-    return {
-        fx: k * nx * (factor + diskPenalty),
-        fy: k * ny * (factor + diskPenalty),
-    };
+    return { fx: k * nx * (factor + diskPenalty), fy: k * ny * (factor + diskPenalty) };
 }
 
 function fieldLine(t, c) {
@@ -1058,10 +1058,7 @@ function calcPotentialEnergy() {
         if (c.type === 'point') {
             const d = Math.max(dist(t.x, t.y, c.x, c.y), SOFT);
             U += (c.sign * Q_FIXED * 1.0) / d;
-        } else if (c.type === 'ring') {
-            const d = Math.max(dist(t.x, t.y, c.x, c.y), SOFT);
-            U += (c.sign * c.charge * Q_FIXED * 1.0) / d;
-        } else if (c.type === 'disk') {
+        } else if (c.type === 'ring' || c.type === 'disk') {
             const d = Math.max(dist(t.x, t.y, c.x, c.y), SOFT);
             U += (c.sign * c.charge * Q_FIXED * 1.0) / d;
         } else if (c.type === 'line') {
@@ -1080,30 +1077,24 @@ function update(dt) {
         const c = state.fixed[i];
         if (c.pulse > 0) c.pulse = Math.max(0, c.pulse - dt * 4);
     }
-
     for (const col of state.collectibles) {
         if (col.pulse > 0) col.pulse = Math.max(0, col.pulse - dt * 3);
     }
-
     for (let i = state.particles.length - 1; i >= 0; i--) {
         const p = state.particles[i];
-        p.x += p.vx * dt;
-        p.y += p.vy * dt;
-        p.life -= dt;
-        p.vx *= 0.98;
-        p.vy *= 0.98;
+        p.x += p.vx * dt; p.y += p.vy * dt;
+        p.life -= dt; p.vx *= 0.98; p.vy *= 0.98;
         if (p.life <= 0) state.particles.splice(i, 1);
     }
 
-    // ====== 更新数值显示（低频） ======
     updateDisplayValues(dt);
 
+    if (!state.running) return;
     if (state.phase !== 'playing') return;
     if (state.paused) return;
 
     state.elapsed += dt;
 
-    // 更新计时器
     if (state.timeLimit > 0) {
         state.timeRemaining = Math.max(0, state.timeLimit - state.elapsed);
         setTimeDisplay(state.timeRemaining);
@@ -1116,11 +1107,9 @@ function update(dt) {
         setTimeDisplay(state.elapsed);
     }
 
-    // 更新电势能显示
     const U = calcPotentialEnergy();
     setEnergyDisplay(U);
 
-    // 随机事件
     state.eventTimer += dt;
     if (state.eventTimer >= state.eventInterval) {
         state.eventTimer = 0;
@@ -1157,17 +1146,11 @@ function update(dt) {
                 const r = Math.sqrt(d2);
                 const k = q / (d2 * r) * (1 + r * FAR_BOOST);
                 f = { fx: k * dx, fy: k * dy };
-            } else if (c.type === 'ring') {
-                f = fieldRing(t, c);
-            } else if (c.type === 'disk') {
-                f = fieldDisk(t, c);
-            } else if (c.type === 'line') {
-                f = fieldLine(t, c);
-            } else {
-                f = { fx: 0, fy: 0 };
-            }
-            fx += f.fx;
-            fy += f.fy;
+            } else if (c.type === 'ring') f = fieldRing(t, c);
+            else if (c.type === 'disk') f = fieldDisk(t, c);
+            else if (c.type === 'line') f = fieldLine(t, c);
+            else f = { fx: 0, fy: 0 };
+            fx += f.fx; fy += f.fy;
         }
 
         t.vx += (fx - DRAG * t.vx) / MASS * dt;
@@ -1222,7 +1205,6 @@ function update(dt) {
             spawnParticles(col.x, col.y, 12, `hsl(${col.hue}, 80%, 65%)`);
             sfxCollect();
             state.comboCount++;
-            // 更新收集显示（即时更新，因为事件驱动）
             const got = state.collectibles.filter(c => c.collected).length;
             setCollectDisplay(got, state.collectibles.length);
         }
@@ -1238,7 +1220,6 @@ function update(dt) {
         const got = state.collectibles.filter(c => c.collected).length;
         const total = state.collectibles.length;
         if (got >= total) {
-            // 完成
             state.phase = 'won';
             state.winAt = performance.now();
             for (let i = 0; i < 20; i++) spawnParticles(state.goal.x, state.goal.y, 1, '#2ed573');
@@ -1246,10 +1227,9 @@ function update(dt) {
             if (state.mode === 'endless') {
                 state.level++;
                 state.totalScore += Math.max(1, Math.floor(1000 - state.elapsed * 10));
-                setTimeout(() => { if (state.phase === 'won') { newGame(); } }, 1800);
+                setTimeout(() => { if (state.phase === 'won' && state.running) newGame(); }, 1800);
             }
         } else {
-            // 未收集完，显示提示但不结束
             if (!state._warnedGoal) {
                 state._warnedGoal = true;
                 showToast('⚠ 还有 ' + (total - got) + ' 个粒子未收集！', 1500, 'warn');
@@ -1293,11 +1273,9 @@ function spawnParticles(x, y, count, color) {
 // ============================================================
 function render() {
     const now = performance.now();
-
     ctx.fillStyle = '#0a0e14';
     ctx.fillRect(0, 0, W, H);
 
-    // 网格
     ctx.save();
     ctx.strokeStyle = '#151a24';
     ctx.lineWidth = 0.6;
@@ -1310,6 +1288,8 @@ function render() {
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
     }
     ctx.restore();
+
+    if (!state.running) return;
 
     drawGoal(now);
     drawCollectibles(now);
@@ -1327,35 +1307,29 @@ function drawGoal(now) {
     if (!g) return;
     const pulse = 1 + Math.sin(now / 380) * 0.06;
     const R = g.r * pulse;
-
     const got = state.collectibles.filter(c => c.collected).length;
     const total = state.collectibles.length;
     const ready = got >= total;
 
     const grad = ctx.createRadialGradient(g.x, g.y, 0, g.x, g.y, R);
     if (ready) {
-        grad.addColorStop(0,   'rgba(46, 213, 115, 0.30)');
+        grad.addColorStop(0, 'rgba(46, 213, 115, 0.30)');
         grad.addColorStop(0.6, 'rgba(46, 213, 115, 0.10)');
-        grad.addColorStop(1,   'rgba(46, 213, 115, 0)');
+        grad.addColorStop(1, 'rgba(46, 213, 115, 0)');
     } else {
-        grad.addColorStop(0,   'rgba(100, 100, 130, 0.15)');
+        grad.addColorStop(0, 'rgba(100, 100, 130, 0.15)');
         grad.addColorStop(0.6, 'rgba(100, 100, 130, 0.05)');
-        grad.addColorStop(1,   'rgba(100, 100, 130, 0)');
+        grad.addColorStop(1, 'rgba(100, 100, 130, 0)');
     }
     ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(g.x, g.y, R, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(g.x, g.y, R, 0, Math.PI * 2); ctx.fill();
 
     ctx.save();
-    ctx.translate(g.x, g.y);
-    ctx.rotate(now / 2000);
+    ctx.translate(g.x, g.y); ctx.rotate(now / 2000);
     ctx.setLineDash([10, 12]);
     ctx.strokeStyle = ready ? 'rgba(46, 213, 115, 0.75)' : 'rgba(120, 120, 150, 0.4)';
     ctx.lineWidth = 2.2;
-    ctx.beginPath();
-    ctx.arc(0, 0, R, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
 
     ctx.strokeStyle = ready ? 'rgba(46, 213, 115, 0.4)' : 'rgba(120, 120, 150, 0.25)';
@@ -1364,13 +1338,6 @@ function drawGoal(now) {
     ctx.moveTo(g.x - 10, g.y); ctx.lineTo(g.x + 10, g.y);
     ctx.moveTo(g.x, g.y - 10); ctx.lineTo(g.x, g.y + 10);
     ctx.stroke();
-
-    if (!ready) {
-        ctx.font = '600 12px system-ui, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = 'rgba(160, 160, 200, 0.6)';
-        ctx.fillText('需收集全部粒子', g.x, g.y + R + 18);
-    }
 }
 
 function drawCollectibles(now) {
@@ -1378,40 +1345,26 @@ function drawCollectibles(now) {
         if (col.collected) continue;
         const pulse = 1 + Math.sin(now / 300 + col.hue) * 0.15;
         const R = col.r * pulse;
-
         const grad = ctx.createRadialGradient(col.x, col.y, 0, col.x, col.y, R * 2.5);
         grad.addColorStop(0, `hsla(${col.hue}, 80%, 65%, 0.25)`);
         grad.addColorStop(1, `hsla(${col.hue}, 80%, 65%, 0)`);
         ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(col.x, col.y, R * 2.5, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.beginPath();
-        ctx.arc(col.x, col.y, R, 0, Math.PI * 2);
-        ctx.fillStyle = `hsl(${col.hue}, 80%, 65%)`;
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(255,255,255,0.6)';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
+        ctx.beginPath(); ctx.arc(col.x, col.y, R * 2.5, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(col.x, col.y, R, 0, Math.PI * 2);
+        ctx.fillStyle = `hsl(${col.hue}, 80%, 65%)`; ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1.5; ctx.stroke();
     }
 }
 
 function drawTrail() {
     const tr = state.trail;
     if (tr.length < 2) return;
-
-    ctx.save();
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     for (let i = 1; i < tr.length; i++) {
         const a = (i / tr.length) * 0.28;
         ctx.strokeStyle = 'rgba(46, 213, 115, ' + a + ')';
         ctx.lineWidth = 1 + (i / tr.length) * 2.5;
-        ctx.beginPath();
-        ctx.moveTo(tr[i - 1].x, tr[i - 1].y);
-        ctx.lineTo(tr[i].x, tr[i].y);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(tr[i - 1].x, tr[i - 1].y); ctx.lineTo(tr[i].x, tr[i].y); ctx.stroke();
     }
     ctx.restore();
 }
@@ -1422,7 +1375,6 @@ function drawFixedCharges(now) {
         const isPos = c.sign > 0;
         const rgb = isPos ? '255, 92, 108' : '77, 124, 255';
         const pulseFactor = 1 + c.pulse * 0.4;
-
         if (c.type === 'point') drawPointCharge(c, rgb, pulseFactor, now);
         else if (c.type === 'ring') drawRingCharge(c, rgb, pulseFactor, now);
         else if (c.type === 'disk') drawDiskCharge(c, rgb, pulseFactor, now);
@@ -1432,58 +1384,293 @@ function drawFixedCharges(now) {
 
 function drawPointCharge(c, rgb, pulseFactor, now) {
     const R = c.r * pulseFactor;
-
     ctx.save();
-    ctx.setLineDash([5, 5]);
-    ctx.lineDashOffset = -now / 80;
-    ctx.strokeStyle = 'rgba(' + rgb + ', 0.50)';
-    ctx.lineWidth = 1.8;
-    ctx.beginPath();
-    ctx.arc(c.x, c.y, c.shellR, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.setLineDash([5, 5]); ctx.lineDashOffset = -now / 80;
+    ctx.strokeStyle = 'rgba(' + rgb + ', 0.50)'; ctx.lineWidth = 1.8;
+    ctx.beginPath(); ctx.arc(c.x, c.y, c.shellR, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
-
-    ctx.beginPath();
-    ctx.arc(c.x, c.y, c.shellR, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(' + rgb + ', 0.05)';
-    ctx.fill();
-
+    ctx.beginPath(); ctx.arc(c.x, c.y, c.shellR, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(' + rgb + ', 0.05)'; ctx.fill();
     const g = ctx.createRadialGradient(c.x, c.y, R * 0.5, c.x, c.y, R * 2.8);
     g.addColorStop(0, 'rgba(' + rgb + ', ' + (0.28 + c.pulse * 0.30) + ')');
     g.addColorStop(1, 'rgba(' + rgb + ', 0)');
     ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(c.x, c.y, R * 2.8, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(c.x, c.y, R, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgb(' + rgb + ')'; ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.arc(c.x, c.y, R * 2.8, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.arc(c.x, c.y, R, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgb(' + rgb + ')';
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 3;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(c.x - R * 0.38, c.y);
-    ctx.lineTo(c.x + R * 0.38, c.y);
-    if (c.sign > 0) {
-        ctx.moveTo(c.x, c.y - R * 0.38);
-        ctx.lineTo(c.x, c.y + R * 0.38);
-    }
+    ctx.moveTo(c.x - R * 0.38, c.y); ctx.lineTo(c.x + R * 0.38, c.y);
+    if (c.sign > 0) { ctx.moveTo(c.x, c.y - R * 0.38); ctx.lineTo(c.x, c.y + R * 0.38); }
     ctx.stroke();
 }
 
 function drawRingCharge(c, rgb, pulseFactor, now) {
     const R = c.R;
-
     const g = ctx.createRadialGradient(c.x, c.y, R * 0.7, c.x, c.y, R * 1.8);
     g.addColorStop(0, 'rgba(' + rgb + ', 0.12)');
     g.addColorStop(0.5, 'rgba(' + rgb + ', ' + (0.08 + c.pulse * 0.20) + ')');
     g.addColorStop(1, 'rgba(' + rgb + ', 0)');
-    ctx.fillStyle = g;
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(c.x, c.y, R * 1.8, 0, Math.PI * 2); ctx.fill();
+    for (let i = 0; i < 5; i++) {
+        const r = R - 6 + i * 3;
+        ctx.beginPath(); ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(${rgb}, ${0.25 + i * 0.12})`;
+        ctx.lineWidth = 2.5; ctx.stroke();
+    }
+    const dots = 24;
+    for (let i = 0; i < dots; i++) {
+        const a = (i / dots) * Math.PI * 2 + now / 3000;
+        const dx = c.x + R * Math.cos(a), dy = c.y + R * Math.sin(a);
+        ctx.beginPath(); ctx.arc(dx, dy, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, ' + (0.5 + c.pulse * 0.4) + ')'; ctx.fill();
+    }
+    ctx.font = 'bold 20px system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(' + rgb + ', 0.6)';
+    ctx.fillText(c.sign > 0 ? '+' : '−', c.x, c.y);
+    ctx.textBaseline = 'alphabetic';
+}
+
+function drawDiskCharge(c, rgb, pulseFactor, now) {
+    const R = c.R;
+    const g = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, R);
+    g.addColorStop(0, 'rgba(' + rgb + ', ' + (0.15 + c.pulse * 0.2) + ')');
+    g.addColorStop(0.7, 'rgba(' + rgb + ', ' + (0.08 + c.pulse * 0.1) + ')');
+    g.addColorStop(1, 'rgba(' + rgb + ', 0.03)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(c.x, c.y, R, 0, Math.PI * 2); ctx.fill();
+    ctx.save();
+    ctx.setLineDash([6, 6]); ctx.lineDashOffset = -now / 60;
+    ctx.strokeStyle = 'rgba(' + rgb + ', 0.7)'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(c.x, c.y, R, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+    for (let i = 1; i <= 4; i++) {
+        const r = R * i / 5;
+        ctx.beginPath(); ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(' + rgb + ', ' + (0.06 + i * 0.03 + c.pulse * 0.1) + ')';
+        ctx.lineWidth = 1.5; ctx.stroke();
+    }
+    ctx.font = 'bold 22px system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(' + rgb + ', 0.5)';
+    ctx.fillText(c.sign > 0 ? '+' : '−', c.x, c.y);
+    ctx.textBaseline = 'alphabetic';
+}
+
+function drawLineCharge(c, rgb, pulseFactor, now) {
+    const x = c.x;
+    ctx.save();
+    ctx.setLineDash([4, 8]); ctx.lineDashOffset = now / 100;
+    for (let i = 0; i < 8; i++) {
+        const y = (i / 8) * H;
+        ctx.strokeStyle = 'rgba(' + rgb + ', 0.08)'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+    ctx.restore();
+    const layers = [
+        { width: 8, alpha: 0.12 }, { width: 5, alpha: 0.25 },
+        { width: 3, alpha: 0.5 }, { width: 1.5, alpha: 0.9 },
+    ];
+    for (const layer of layers) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H);
+        ctx.strokeStyle = 'rgba(' + rgb + ', ' + (layer.alpha + c.pulse * 0.2) + ')';
+        ctx.lineWidth = layer.width; ctx.stroke();
+    }
+    const dots = 16;
+    for (let i = 0; i < dots; i++) {
+        const y = (i / dots) * H;
+        ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, ' + (0.4 + c.pulse * 0.4) + ')'; ctx.fill();
+    }
+}
+
+function drawTestCharge(now) {
+    const t = state.test;
+    if (!t) return;
+    const U = calcPotentialEnergy();
+    const intensity = clamp(U / 2e6, -1, 1);
+    const r = Math.round(46 + 80 * Math.max(0, intensity));
+    const g = Math.round(213 - 50 * Math.abs(intensity));
+    const b = Math.round(115 + 100 * Math.max(0, -intensity));
+    const pulse = 1 + Math.sin(now / 200) * 0.08;
+    const grad = ctx.createRadialGradient(t.x, t.y, t.r * 0.5, t.x, t.y, t.r * 3 * pulse);
+    grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.25)`);
+    grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(t.x, t.y, t.r * 3 * pulse, 0, Math.PI * 2); ctx.fill();
+    ctx.save();
+    ctx.shadowColor = `rgb(${r}, ${g}, ${b})`;
+    ctx.shadowBlur = 22 + 18 * Math.abs(intensity);
+    ctx.beginPath(); ctx.arc(t.x, t.y, t.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgb(${r}, ${g}, ${b})`; ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle = '#0a0e14'; ctx.lineWidth = 2.6; ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.arc(c.x, c.y, R * 1
+    ctx.moveTo(t.x - 5, t.y); ctx.lineTo(t.x + 5, t.y);
+    ctx.moveTo(t.x, t.y - 5); ctx.lineTo(t.x, t.y + 5);
+    ctx.stroke();
+}
+
+function drawParticles() {
+    for (const p of state.particles) {
+        const a = p.life / p.maxLife;
+        ctx.globalAlpha = a * 0.8;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r * a, 0, Math.PI * 2);
+        ctx.fillStyle = p.color; ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+}
+
+function drawWinOverlay() {
+    ctx.fillStyle = 'rgba(8, 10, 20, 0.78)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = 'center';
+    const got = state.collectibles.filter(c => c.collected).length;
+    const total = state.collectibles.length;
+    const allCollected = got === total;
+    ctx.fillStyle = allCollected ? '#ffd966' : '#2ed573';
+    ctx.font = '700 32px system-ui, sans-serif';
+    ctx.fillText(allCollected ? '完美通关！' : '电荷已抵达目标', W / 2, H / 2 - 40);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.font = '400 17px system-ui, sans-serif';
+    ctx.fillText('用时 ' + state.elapsed.toFixed(1) + ' 秒 · 翻转 ' + state.flipped + ' 次', W / 2, H / 2 + 5);
+    if (!allCollected) {
+        ctx.fillStyle = 'rgba(255, 220, 120, 0.7)';
+        ctx.font = '400 15px system-ui, sans-serif';
+        ctx.fillText('收集粒子 ' + got + '/' + total, W / 2, H / 2 + 40);
+    }
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.font = '400 14px system-ui, sans-serif';
+    ctx.fillText('点击屏幕 / 按 R 键  ·  继续', W / 2, H / 2 + 80);
+}
+
+function drawLostOverlay() {
+    ctx.fillStyle = 'rgba(20, 8, 12, 0.82)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ff4757';
+    ctx.font = '700 32px system-ui, sans-serif';
+    ctx.fillText('⏱ 时间到！', W / 2, H / 2 - 30);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    ctx.font = '400 16px system-ui, sans-serif';
+    ctx.fillText('按 R 键重新开始', W / 2, H / 2 + 30);
+}
+
+// ============================================================
+//  输入
+// ============================================================
+canvas.addEventListener('pointerdown', function (e) {
+    if (!state.running) return;
+    if (state.paused) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    if (state.phase === 'won') {
+        if (performance.now() - state.winAt > 400) newGame();
+        return;
+    }
+    if (state.phase === 'lost') {
+        newGame();
+        return;
+    }
+
+    // 点击固定电荷翻转
+    for (let i = state.fixed.length - 1; i >= 0; i--) {
+        const c = state.fixed[i];
+        let hit = false;
+        if (c.type === 'point') hit = dist(x, y, c.x, c.y) < c.shellR + 14;
+        else if (c.type === 'ring') hit = Math.abs(dist(x, y, c.x, c.y) - c.R) < 22;
+        else if (c.type === 'disk') hit = dist(x, y, c.x, c.y) < c.R + 14;
+        else if (c.type === 'line') hit = Math.abs(x - c.x) < 26;
+        if (hit) {
+            c.sign *= -1;
+            c.pulse = 1;
+            state.flipped++;
+            setFlipDisplay(state.flipped);
+            sfxFlip(c.sign > 0);
+            const col = c.sign > 0 ? '#ff5c6c' : '#4d7cff';
+            const px = c.type === 'line' ? c.x : c.x;
+            const py = c.type === 'line' ? y : c.y;
+            spawnParticles(px, py, 8, col);
+            return;
+        }
+    }
+
+    // 点击试验电荷重置速度
+    if (state.test && dist(x, y, state.test.x, state.test.y) < state.test.r * 2.5) {
+        state.test.vx = 0; state.test.vy = 0;
+        spawnParticles(state.test.x, state.test.y, 6, '#2ed573');
+        return;
+    }
+});
+
+window.addEventListener('keydown', function (e) {
+    if (e.code === 'KeyM') {
+        if (state.running) {
+            state.paused ? hidePause() : showPause();
+        }
+        return;
+    }
+    if (e.code === 'Space' && state.running && !state.paused) {
+        e.preventDefault();
+        showPause();
+        return;
+    }
+    if (e.code === 'KeyR' && state.running) {
+        newGame();
+        return;
+    }
+    if (e.code === 'Escape' && state.running) {
+        state.paused ? hidePause() : showPause();
+        return;
+    }
+    // 数字键切换模型（需停止游戏）
+    if (!state.running && e.code.startsWith('Digit')) {
+        const n = parseInt(e.code.replace('Digit', ''), 10);
+        if (n >= 1 && n <= MODELS.length) {
+            state.modelIndex = n - 1;
+            document.querySelectorAll('#startModelGrid .start-item').forEach((el, i) => {
+                el.classList.toggle('selected', i === state.modelIndex);
+            });
+        }
+    }
+});
+
+// ============================================================
+//  窗口尺寸变化
+// ============================================================
+let resizeTimer = 0;
+window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () {
+        resize();
+        if (state.running && !state.paused) newGame();
+    }, 200);
+});
+
+// ============================================================
+//  主循环
+// ============================================================
+let lastTime = 0;
+function loop(now) {
+    if (!lastTime) lastTime = now;
+    const dt = Math.min((now - lastTime) / 1000, 0.05);
+    lastTime = now;
+    update(dt);
+    render();
+    requestAnimationFrame(loop);
+}
+
+// ============================================================
+//  启动
+// ============================================================
+resize();
+initStartScreen();
+requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>
