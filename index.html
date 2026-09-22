@@ -1,134 +1,549 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <title>2D静电场教学模拟器</title>
-    <style>
-        body {font-family:system-ui; padding:12px; max-width:1200px; margin:0 auto;}
-        canvas {border:1px solid #333; background:#fff;}
-        .panel {margin-bottom:8px;}
-        button {padding:6px 12px; margin:3px; cursor:pointer;}
-        .warn {color:red; font-weight:bold;}
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>静电场解谜大师 | Electrostatic Field Puzzle</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: linear-gradient(135deg, #0f0c29 0%, #1a1a4e 50%, #24243e 100%);
+    color: #e0e0ff;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px;
+  }
+  h1 {
+    font-size: 28px;
+    margin: 8px 0 4px;
+    background: linear-gradient(90deg, #ff6b6b, #feca57, #48dbfb, #ff6b6b);
+    background-size: 300% 100%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 4s linear infinite;
+  }
+  @keyframes shimmer {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 300% 50%; }
+  }
+  .subtitle { font-size: 13px; color: #8888bb; margin-bottom: 12px; }
+  .game-container {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 1200px;
+  }
+  .canvas-wrap {
+    position: relative;
+    border: 2px solid #4a4a8a;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+  canvas { display: block; background: #0a0a1e; cursor: crosshair; }
+  .panel {
+    width: 280px;
+    background: rgba(20, 20, 50, 0.85);
+    border: 1px solid #4a4a8a;
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .panel h2 {
+    font-size: 16px;
+    color: #feca57;
+    border-bottom: 1px solid #4a4a8a;
+    padding-bottom: 6px;
+  }
+  .btn {
+    padding: 10px 14px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 600;
+  }
+  .btn:hover { transform: translateY(-1px); filter: brightness(1.15); }
+  .btn-charge-pos { background: linear-gradient(135deg, #ff6b6b, #ee5a5a); color: white; }
+  .btn-charge-neg { background: linear-gradient(135deg, #48dbfb, #0abde3); color: #0a0a2e; }
+  .btn-action { background: linear-gradient(135deg, #a55eea, #8854d0); color: white; }
+  .btn-ghost { background: rgba(255,255,255,0.08); color: #ccc; border: 1px solid #555; }
+  .selected { outline: 3px solid #feca57; }
+  .info-box {
+    background: rgba(0,0,0,0.3);
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .info-box .label { color: #feca57; font-weight: 600; }
+  .level-info {
+    background: rgba(254, 202, 87, 0.1);
+    border-left: 3px solid #feca57;
+    padding: 10px;
+    border-radius: 4px;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .knowledge-tag {
+    display: inline-block;
+    background: rgba(165, 94, 234, 0.25);
+    color: #d2b4ff;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    margin: 2px;
+  }
+  .status-bar {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: rgba(0,0,0,0.4);
+    font-size: 13px;
+  }
+  .status-bar .win { color: #2ecc71; font-weight: bold; }
+  .status-bar .lose { color: #ff6b6b; font-weight: bold; }
+  .charge-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .action-buttons { display: flex; flex-direction: column; gap: 6px; }
+  .level-selector { display: flex; flex-wrap: wrap; gap: 4px; }
+  .level-btn {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    border: 1px solid #555;
+    background: rgba(255,255,255,0.05);
+    color: #ccc;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .level-btn.active { background: #feca57; color: #000; border-color: #feca57; }
+  .level-btn.done { background: #2ecc71; color: #000; border-color: #2ecc71; }
+  .hint-text { font-size: 12px; color: #888; }
+</style>
 </head>
 <body>
-    <div class="warn">⚠ 提示：本模拟器为2D可视化模型，仅用于教学演示，非严格物理仿真</div>
-    <div class="panel">
-        <button id="btnPlus">添加正电荷(+q)</button>
-        <button id="btnMinus">添加负电荷(-q)</button>
-        <button id="btnClear">清空全部场源</button>
-        <span id="tip">操作：先点按钮，再点击画布放置电荷，自动绘制电场线</span>
+
+<h1>⚡ 静电场解谜大师 ⚡</h1>
+<div class="subtitle">Electrostatic Field Puzzle Master — 用电场线引导电荷到达目标</div>
+
+<div class="game-container">
+  <div class="canvas-wrap">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div class="status-bar">
+      <span id="statusText">第 1 关：认识点电荷</span>
+      <span id="resultText"></span>
     </div>
-    <canvas id="canvas" width="800" height="500"></canvas>
+  </div>
+
+  <div class="panel">
+    <h2>🎮 操作面板</h2>
+
     <div>
-        <h3>闯关习题</h3>
-        <div id="quiz">
-            <p>1. 电场线起始于？A正电荷 B负电荷</p>
-            <button onclick="check1('A')">A</button>
-            <button onclick="check1('B')">B</button>
-            <p id="ans1"></p>
-        </div>
+      <div style="font-size:13px; color:#888; margin-bottom:6px;">选择放置类型：</div>
+      <div class="charge-buttons">
+        <button class="btn btn-charge-pos selected" id="btnPos">➕ 正电荷</button>
+        <button class="btn btn-charge-neg" id="btnNeg">➖ 负电荷</button>
+      </div>
     </div>
+
+    <div>
+      <div style="font-size:13px; color:#888; margin-bottom:6px;">操作：</div>
+      <div class="action-buttons">
+        <button class="btn btn-action" id="btnLaunch">🚀 发射测试电荷</button>
+        <button class="btn btn-ghost" id="btnClear">🗑️ 清空所有电荷</button>
+        <button class="btn btn-ghost" id="btnShowField">⚡ 显示/隐藏电场线</button>
+      </div>
+    </div>
+
+    <div>
+      <div style="font-size:13px; color:#888; margin-bottom:6px;">选择关卡：</div>
+      <div class="level-selector" id="levelSelector"></div>
+    </div>
+
+    <div class="level-info" id="levelInfo">
+      <b>第 1 关：认识点电荷</b><br>
+      在画布上点击放置一个<b style="color:#ff6b6b;">正电荷</b>，观察电场线从正电荷向外辐射的形态。
+      然后点击「发射测试电荷」，看它如何沿电场方向被推出去。
+    </div>
+
+    <div class="info-box">
+      <div><span class="label">操作说明：</span></div>
+      <div>• 点击画布放置选中类型的电荷</div>
+      <div>• 拖拽已有电荷可移动位置</div>
+      <div>• 右键点击电荷可删除它</div>
+      <div>• 目标：让测试电荷到达绿色终点</div>
+    </div>
+
+    <div class="info-box">
+      <div><span class="label">📚 知识点：</span></div>
+      <div id="knowledgeTags">
+        <span class="knowledge-tag">点电荷场强 E=kq/r²</span>
+        <span class="knowledge-tag">电场叠加原理</span>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
-const canvas = document.getElementById('canvas');
+// ============ 游戏核心逻辑 ============
+const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-let chargeList = [];
-let mode = null;
+const W = canvas.width, H = canvas.height;
 
-const STEP = 3;
-const MAX_STEP = 2000; // 大幅增加追踪步数，拉长电场线
-const CHARGE_RADIUS = 14;
+// 游戏状态
+let charges = [];        // 所有放置的电荷 {x, y, q}
+let selectedTool = 'pos'; // 'pos' 或 'neg'
+let testParticle = null;  // 测试电荷 {x, y, vx, vy, active}
+let showFieldLines = true;
+let currentLevel = 1;
+let draggingCharge = null;
+let dragOffsetX = 0, dragOffsetY = 0;
 
-document.getElementById('btnPlus').onclick = ()=>{mode='plus';document.getElementById('tip').textContent='当前：放置正电荷，点击画布';}
-document.getElementById('btnMinus').onclick = ()=>{mode='minus';document.getElementById('tip').textContent='当前：放置负电荷，点击画布';}
-document.getElementById('btnClear').onclick = ()=>{chargeList=[];render();}
+// 关卡定义
+const levels = [
+  {
+    id: 1,
+    name: '认识点电荷',
+    target: { x: 650, y: 300 },
+    start: { x: 150, y: 300 },
+    maxCharges: 1,
+    hint: '在画布上放置一个<b style="color:#ff6b6b;">正电荷</b>，观察电场线向外辐射。然后发射测试电荷，看它如何沿电场方向运动。',
+    knowledge: ['点电荷场强 E=kq/r²', '电场线从正电荷出发', '正电荷受力沿电场方向']
+  },
+  {
+    id: 2,
+    name: '电偶极子',
+    target: { x: 700, y: 100 },
+    start: { x: 100, y: 500 },
+    maxCharges: 2,
+    hint: '放置<b style="color:#ff6b6b;">正电荷</b>和<b style="color:#48dbfb;">负电荷</b>各一个，形成电偶极子。观察电场线从正电荷出发、终止于负电荷的形态。',
+    knowledge: ['电偶极子', '等量异种电荷', '电场线从正到负', '矢量叠加原理']
+  },
+  {
+    id: 3,
+    name: '电场叠加',
+    target: { x: 700, y: 300 },
+    start: { x: 100, y: 300 },
+    maxCharges: 4,
+    hint: '在中间放置障碍物，用多个电荷组合出弯曲的电场路径，引导测试电荷绕过障碍到达终点。',
+    knowledge: ['电场叠加原理', '矢量合成', '电场线弯曲', '多个电荷的场强叠加']
+  },
+  {
+    id: 4,
+    name: '对称之美',
+    target: { x: 400, y: 80 },
+    start: { x: 400, y: 520 },
+    maxCharges: 6,
+    hint: '利用对称性！在两侧对称放置电荷，让水平分量互相抵消，只留下垂直方向的电场，把测试电荷笔直推向上方。',
+    knowledge: ['对称性分析', '分量抵消', '中垂面电场', '1/r³ 衰减']
+  },
+  {
+    id: 5,
+    name: '终极挑战',
+    target: { x: 720, y: 80 },
+    start: { x: 80, y: 520 },
+    maxCharges: 8,
+    hint: '综合运用所有知识！设计一条完整的电场路径，让测试电荷从左下角飞到右上角。注意电场线是连续弯曲的。',
+    knowledge: ['综合应用', '电场线拓扑', '电偶极矩', '远场近似']
+  }
+];
 
-// 画布点击放置电荷
-canvas.onclick = function(e){
-    if(!mode) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const q = mode==='plus' ? 1 : -1;
-    chargeList.push({x,y,q});
-    render();
+// 物理常量（游戏单位）
+const K = 5000; // 库仑常数缩放
+const PARTICLE_CHARGE = 1;
+const PARTICLE_MASS = 0.5;
+
+// ============ 初始化关卡选择器 ============
+function initLevelSelector() {
+  const sel = document.getElementById('levelSelector');
+  sel.innerHTML = '';
+  levels.forEach((lv, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'level-btn' + (idx + 1 === currentLevel ? ' active' : '');
+    btn.textContent = idx + 1;
+    btn.onclick = () => loadLevel(idx + 1);
+    sel.appendChild(btn);
+  });
 }
 
-// 计算电场【修复公式：返回归一化电场方向向量，固定步长】
-function getFieldNormalized(px, py){
-    let Ex=0, Ey=0;
-    for(const c of chargeList){
-        const dx = px - c.x;
-        const dy = py - c.y;
-        const r2 = dx*dx + dy*dy;
-        const r = Math.sqrt(r2);
-        // 如果靠近任意电荷，直接返回null，终止绘制
-        if(r < CHARGE_RADIUS) return null;
-        const E = c.q / r2;
-        Ex += E * dx / r;
-        Ey += E * dy / r;
-    }
-    const mag = Math.sqrt(Ex*Ex + Ey*Ey);
-    if(mag < 1e-6) return null; // 场强几乎为0，停止
-    // 归一化：只保留方向，保证每一步移动距离固定，不会大步跳跃
-    return {nx: Ex/mag, ny: Ey/mag};
+function loadLevel(n) {
+  currentLevel = n;
+  charges = [];
+  testParticle = null;
+  const lv = levels[n - 1];
+  document.getElementById('statusText').textContent = `第 ${n} 关：${lv.name}`;
+  document.getElementById('resultText').textContent = '';
+  document.getElementById('levelInfo').innerHTML =
+    `<b>第 ${n} 关：${lv.name}</b><br>${lv.hint}<br><br>最多可放置 ${lv.maxCharges} 个电荷。`;
+  document.getElementById('knowledgeTags').innerHTML =
+    lv.knowledge.map(k => `<span class="knowledge-tag">${k}</span>`).join('');
+  initLevelSelector();
+  draw();
 }
 
-// 绘制单条电场线
-function drawFieldLine(startX, startY){
-    ctx.beginPath();
-    ctx.moveTo(startX, startY);
-    let x = startX, y = startY;
-    for(let i=0;i<MAX_STEP;i++){
-        const f = getFieldNormalized(x,y);
-        if(!f) break;
-        const nx = x + f.nx * STEP;
-        const ny = y + f.ny * STEP;
-        // 碰到画布边界，停止
-        if(nx<0 || nx>canvas.width || ny<0 || ny>canvas.height) break;
-        x = nx;
-        y = ny;
-        ctx.lineTo(x,y);
-    }
-    ctx.strokeStyle="#3377ff";
-    ctx.lineWidth=1;
-    ctx.stroke();
+// ============ 物理计算 ============
+function getElectricField(x, y) {
+  let Ex = 0, Ey = 0;
+  for (const c of charges) {
+    const dx = x - c.x;
+    const dy = y - c.y;
+    const r2 = dx*dx + dy*dy;
+    const r = Math.sqrt(r2);
+    if (r < 5) continue;
+    const E = K * c.q / r2;
+    Ex += E * dx / r;
+    Ey += E * dy / r;
+  }
+  return { Ex, Ey };
 }
 
-// 主渲染函数
-function render(){
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    // 从正电荷表面发射电场线
-    for(const c of chargeList){
-        if(c.q > 0){
-            const numLine = 16; // 电场线数量，可以修改，越多越密
-            for(let i=0;i<numLine;i++){
-                const ang = (i / numLine) * Math.PI * 2;
-                const sx = c.x + Math.cos(ang)*CHARGE_RADIUS;
-                const sy = c.y + Math.sin(ang)*CHARGE_RADIUS;
-                drawFieldLine(sx, sy);
-            }
+// ============ 电场线绘制 ============
+function drawFieldLines() {
+  if (!showFieldLines || charges.length === 0) return;
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255, 220, 100, 0.35)';
+  ctx.lineWidth = 1;
+
+  // 从每个正电荷出发绘制电场线
+  const linesPerCharge = 12;
+  for (const c of charges) {
+    if (c.q <= 0) continue;
+    for (let i = 0; i < linesPerCharge; i++) {
+      const angle = (i / linesPerCharge) * Math.PI * 2;
+      let px = c.x + Math.cos(angle) * 15;
+      let py = c.y + Math.sin(angle) * 15;
+
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+
+      for (let step = 0; step < 300; step++) {
+        const { Ex, Ey } = getElectricField(px, py);
+        const mag = Math.sqrt(Ex*Ex + Ey*Ey);
+        if (mag < 0.01) break;
+        const stepLen = 4;
+        px += (Ex / mag) * stepLen;
+        py += (Ey / mag) * stepLen;
+
+        // 检查是否碰到负电荷
+        let hitNeg = false;
+        for (const nc of charges) {
+          if (nc.q < 0) {
+            const d = Math.hypot(px - nc.x, py - nc.y);
+            if (d < 12) { hitNeg = true; break; }
+          }
         }
+        if (hitNeg || px < 0 || px > W || py < 0 || py > H) break;
+
+        ctx.lineTo(px, py);
+      }
+      ctx.stroke();
     }
-    // 绘制电荷
-    for(const c of chargeList){
-        ctx.beginPath();
-        ctx.arc(c.x,c.y,CHARGE_RADIUS,0,Math.PI*2);
-        ctx.fillStyle = c.q>0 ? '#f44' : '#44f';
-        ctx.fill();
-        ctx.fillStyle='#fff';
-        ctx.font="18px sans-serif";
-        ctx.textAlign="center";
-        ctx.fillText(c.q>0?"+":"−",c.x,c.y+6);
-    }
+  }
+  ctx.restore();
 }
 
-// 答题
-function check1(sel){
-    document.getElementById('ans1').textContent = sel==='A'?"✅正确，电场线起于正电荷":"❌错误";
+// ============ 绘制 ============
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+
+  // 网格背景
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < W; x += 40) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for (let y = 0; y < H; y += 40) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+
+  // 电场线
+  drawFieldLines();
+
+  const lv = levels[currentLevel - 1];
+
+  // 起点
+  ctx.fillStyle = '#2ecc71';
+  ctx.beginPath();
+  ctx.arc(lv.start.x, lv.start.y, 12, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 10px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('S', lv.start.x, lv.start.y);
+
+  // 终点
+  ctx.fillStyle = '#e74c3c';
+  ctx.beginPath();
+  ctx.arc(lv.target.x, lv.target.y, 14, 0, Math.PI*2);
+  ctx.fill();
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(lv.target.x, lv.target.y, 18, 0, Math.PI*2);
+  ctx.stroke();
+  ctx.fillStyle = '#fff';
+  ctx.fillText('G', lv.target.x, lv.target.y);
+
+  // 绘制电荷
+  for (const c of charges) {
+    const grad = ctx.createRadialGradient(c.x, c.y, 2, c.x, c.y, 20);
+    if (c.q > 0) {
+      grad.addColorStop(0, '#ff6b6b');
+      grad.addColorStop(1, 'rgba(255,107,107,0)');
+    } else {
+      grad.addColorStop(0, '#48dbfb');
+      grad.addColorStop(1, 'rgba(72,219,251,0)');
+    }
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, 20, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.fillStyle = c.q > 0 ? '#ff4757' : '#0abde3';
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, 10, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.fillText(c.q > 0 ? '+' : '−', c.x, c.y);
+  }
+
+  // 绘制测试粒子
+  if (testParticle && testParticle.active) {
+    ctx.fillStyle = '#feca57';
+    ctx.shadowColor = '#feca57';
+    ctx.shadowBlur = 15;
+    ctx.beginPath();
+    ctx.arc(testParticle.x, testParticle.y, 6, 0, Math.PI*2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
 }
-render();
+
+// ============ 游戏循环 ============
+function gameLoop() {
+  if (testParticle && testParticle.active) {
+    const { Ex, Ey } = getElectricField(testParticle.x, testParticle.y);
+    const ax = Ex * PARTICLE_CHARGE / PARTICLE_MASS;
+    const ay = Ey * PARTICLE_CHARGE / PARTICLE_MASS;
+
+    testParticle.vx += ax * 0.016;
+    testParticle.vy += ay * 0.016;
+    testParticle.x += testParticle.vx * 0.016 * 60;
+    testParticle.y += testParticle.vy * 0.016 * 60;
+
+    // 边界检查
+    const lv = levels[currentLevel - 1];
+    const distTarget = Math.hypot(testParticle.x - lv.target.x, testParticle.y - lv.target.y);
+    if (distTarget < 20) {
+      testParticle.active = false;
+      document.getElementById('resultText').innerHTML = '<span class="win">🎉 过关！</span>';
+    } else if (testParticle.x < -20 || testParticle.x > W+20 ||
+               testParticle.y < -20 || testParticle.y > H+20) {
+      testParticle.active = false;
+      document.getElementById('resultText').innerHTML = '<span class="lose">💥 飞出边界了</span>';
+    }
+  }
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+// ============ 交互 ============
+canvas.addEventListener('mousedown', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) * (W / rect.width);
+  const my = (e.clientY - rect.top) * (H / rect.height);
+
+  // 检查是否点击了已有电荷（拖拽）
+  for (let i = charges.length - 1; i >= 0; i--) {
+    const c = charges[i];
+    if (Math.hypot(mx - c.x, my - c.y) < 15) {
+      draggingCharge = c;
+      dragOffsetX = mx - c.x;
+      dragOffsetY = my - c.y;
+      return;
+    }
+  }
+
+  // 放置新电荷
+  const lv = levels[currentLevel - 1];
+  if (charges.length >= lv.maxCharges) {
+    document.getElementById('resultText').textContent = '⚠️ 电荷数量已达上限';
+    return;
+  }
+  charges.push({
+    x: mx,
+    y: my,
+    q: selectedTool === 'pos' ? 1 : -1
+  });
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  if (draggingCharge) {
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * (W / rect.width);
+    const my = (e.clientY - rect.top) * (H / rect.height);
+    draggingCharge.x = mx - dragOffsetX;
+    draggingCharge.y = my - dragOffsetY;
+  }
+});
+
+canvas.addEventListener('mouseup', () => { draggingCharge = null; });
+
+canvas.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) * (W / rect.width);
+  const my = (e.clientY - rect.top) * (H / rect.height);
+  for (let i = charges.length - 1; i >= 0; i--) {
+    if (Math.hypot(mx - charges[i].x, my - charges[i].y) < 15) {
+      charges.splice(i, 1);
+      break;
+    }
+  }
+});
+
+// 按钮事件
+document.getElementById('btnPos').onclick = () => {
+  selectedTool = 'pos';
+  document.getElementById('btnPos').classList.add('selected');
+  document.getElementById('btnNeg').classList.remove('selected');
+};
+document.getElementById('btnNeg').onclick = () => {
+  selectedTool = 'neg';
+  document.getElementById('btnNeg').classList.add('selected');
+  document.getElementById('btnPos').classList.remove('selected');
+};
+document.getElementById('btnClear').onclick = () => {
+  charges = [];
+  testParticle = null;
+  document.getElementById('resultText').textContent = '';
+};
+document.getElementById('btnShowField').onclick = () => {
+  showFieldLines = !showFieldLines;
+};
+document.getElementById('btnLaunch').onclick = () => {
+  const lv = levels[currentLevel - 1];
+  testParticle = {
+    x: lv.start.x,
+    y: lv.start.y,
+    vx: 0, vy: 0,
+    active: true
+  };
+  document.getElementById('resultText').textContent = '';
+};
+
+// ============ 启动 ============
+loadLevel(1);
+gameLoop();
 </script>
 </body>
 </html>
