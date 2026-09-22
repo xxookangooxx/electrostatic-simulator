@@ -809,7 +809,8 @@ function initStartScreen() {
         el.className = 'start-item' + (i === state.modelIndex ? ' selected' : '');
         el.dataset.index = i;
         el.innerHTML = `<span class="item-icon">${m.icon}</span>${m.name}<span class="item-desc">${m.desc}</span>`;
-        el.addEventListener('click', () => {
+        el.addEventListener('click', (e) => {
+            e.stopPropagation();
             sfxClick();
             state.modelIndex = i;
             document.querySelectorAll('#startModelGrid .start-item').forEach(e => e.classList.remove('selected'));
@@ -819,7 +820,8 @@ function initStartScreen() {
     });
 
     document.querySelectorAll('#startModeGrid .start-item').forEach(el => {
-        el.addEventListener('click', () => {
+        el.addEventListener('click', (e) => {
+            e.stopPropagation();
             sfxClick();
             state.mode = el.dataset.mode;
             document.querySelectorAll('#startModeGrid .start-item').forEach(e => e.classList.remove('selected'));
@@ -827,7 +829,8 @@ function initStartScreen() {
         });
     });
 
-    document.getElementById('startPlay').addEventListener('click', () => {
+    document.getElementById('startPlay').addEventListener('click', (e) => {
+        e.stopPropagation();
         initAudio();
         sfxClick();
         startGame();
@@ -838,6 +841,7 @@ function startGame() {
     document.getElementById('startScreen').classList.add('hidden');
     document.getElementById('menuBtn').classList.add('visible');
     state.running = true;
+    state.paused = false;
     newGame();
 }
 
@@ -861,7 +865,6 @@ document.getElementById('backToMenuBtn').addEventListener('click', () => {
     state.running = false;
     document.getElementById('startScreen').classList.remove('hidden');
     document.getElementById('menuBtn').classList.remove('visible');
-    // 清空画布
     ctx.fillStyle = '#0a0e14';
     ctx.fillRect(0, 0, W, H);
 });
@@ -1576,7 +1579,6 @@ canvas.addEventListener('pointerdown', function (e) {
         return;
     }
 
-    // 点击固定电荷翻转
     for (let i = state.fixed.length - 1; i >= 0; i--) {
         const c = state.fixed[i];
         let hit = false;
@@ -1598,7 +1600,6 @@ canvas.addEventListener('pointerdown', function (e) {
         }
     }
 
-    // 点击试验电荷重置速度
     if (state.test && dist(x, y, state.test.x, state.test.y) < state.test.r * 2.5) {
         state.test.vx = 0; state.test.vy = 0;
         spawnParticles(state.test.x, state.test.y, 6, '#2ed573');
@@ -1626,7 +1627,6 @@ window.addEventListener('keydown', function (e) {
         state.paused ? hidePause() : showPause();
         return;
     }
-    // 数字键切换模型（需停止游戏）
     if (!state.running && e.code.startsWith('Digit')) {
         const n = parseInt(e.code.replace('Digit', ''), 10);
         if (n >= 1 && n <= MODELS.length) {
