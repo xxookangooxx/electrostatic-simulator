@@ -3,21 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>静电场 · 多模型电势能探险</title>
+    <title>静电场 · 电荷引导大师</title>
     <style>
         html, body {
             margin: 0; padding: 0; height: 100%;
-            background: #0f0f1a;
+            background: #0a0e14;
             overflow: hidden;
             font-family: system-ui, -apple-system, "PingFang SC", sans-serif;
             -webkit-user-select: none; user-select: none;
             -webkit-tap-highlight-color: transparent;
         }
         #game { display: block; width: 100%; height: 100%; touch-action: none; }
+        #toast {
+            position: fixed; bottom: 90px; left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: rgba(20, 30, 45, 0.94);
+            color: #a8d8ff; padding: 10px 24px;
+            border-radius: 30px; font-size: 14px;
+            border: 1px solid #3d7186;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.6), 0 0 12px rgba(100,180,255,0.2);
+            opacity: 0; transition: all 0.35s ease;
+            pointer-events: none; z-index: 10;
+            letter-spacing: 0.3px;
+            font-weight: 600;
+        }
+        #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        #toast.success { border-color: #2ed573; color: #b0ffc8; box-shadow: 0 0 18px rgba(46,213,115,0.4); }
+        #toast.warn { border-color: #ffa502; color: #ffe0a0; box-shadow: 0 0 18px rgba(255,165,2,0.4); }
     </style>
 </head>
 <body>
 <canvas id="game"></canvas>
+<div id="toast"></div>
 
 <script>
 (function () {
@@ -27,8 +44,53 @@
 //  基础工具
 // ============================================================
 const rnd   = (a, b) => a + Math.random() * (b - a);
+const rndInt = (a, b) => Math.floor(rnd(a, b + 1));
+const pick   = arr => arr[Math.floor(Math.random() * arr.length)];
 const clamp = (v, a, b) => v < a ? a : (v > b ? b : v);
 const dist  = (x1, y1, x2, y2) => Math.hypot(x1 - x2, y1 - y2);
+
+// ============================================================
+//  Toast 提示
+// ============================================================
+const toastEl = document.getElementById('toast');
+let toastTimer = 0;
+function showToast(msg, duration = 1800, type = '') {
+    toastEl.textContent = msg;
+    toastEl.className = 'show ' + type;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toastEl.className = ''; }, duration);
+}
+
+// ============================================================
+//  音效
+// ============================================================
+let audioCtx = null;
+function initAudio() {
+    if (!audioCtx) {
+        try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+        catch (e) { audioCtx = null; }
+    }
+}
+function playTone(freq, dur, type = 'sine', vol = 0.06) {
+    if (!audioCtx) return;
+    try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        gain.gain.value = vol;
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + dur);
+    } catch (e) { /* ignore */ }
+}
+function sfxFlip(pos) { playTone(pos ? 700 : 420, 0.12, 'triangle', 0.06); }
+function sfxCollect() { playTone(880, 0.09, 'sine', 0.07); setTimeout(() => playTone(1320, 0.12, 'sine', 0.05), 55); }
+function sfxWin() { playTone(523, 0.14, 'sine', 0.08); setTimeout(() => playTone(659, 0.14), 110); setTimeout(() => playTone(784, 0.28), 220); }
+function sfxEvent() { playTone(300, 0.2, 'sawtooth', 0.04); }
+function sfxBad() { playTone(180, 0.25, 'sawtooth', 0.07); }
 
 // ============================================================
 //  画布初始化
@@ -49,12 +111,14 @@ function resize() {
 // ============================================================
 //  物理参数
 // ============================================================
-const SOFT       = 30;      // 软化距离
-const Q_FIXED    = 1.6e7;   // 固定电荷电量
-const MASS       = 0.06;    // 试验电荷质量
-const DRAG       = 0.55;    // 阻尼系数
-const MAX_SPEED  = 350;     // 速度上限 px/s
-const FAR_BOOST  = 0.007;   // 远距离力增强系数
+const SOFT       = 34;
+const Q_FIXED    = 1.8e7;
+const MASS       = 0.055;
+const DRAG       = 0.52;
+const MAX_SPEED  = 380;
+const FAR_BOOST  = 0.008;
+const WALL_BOUNCE = 0.45;
+const SHELL_BOUNCE = 0.35;
 
 // ============================================================
 //  游戏状态
@@ -65,49 +129,258 @@ const state = {
     goal:    null,
     flipped: 0,
     elapsed: 0,
-    phase:   'playing',   // playing | won
+    phase:   'playing',
     trail:   [],
     winAt:   0,
     modelIndex: 0,
+    particles: [],
+    collectibles: [],
+    dragging: null,
+    mouseX: 0, mouseY: 0,
+    mouseInCanvas: false,
+    showFieldArrows: true,
+    showHeatmap: false,
+    hoverTarget: null,
+    // 随机事件系统
+    eventTimer: 0,
+    eventInterval: 12,     // 每 12 秒触发一次随机事件
+    activeEvents: [],
+    // 关卡目标
+    goalParticles: 3,      // 需要收集的粒子数
+    goalsCompleted: 0,     // 已完成关卡数
+    // 关卡难度提升
+    level: 1,
 };
 
 // ============================================================
-//  模型定义 —— 5 种静电场模型
+//  随机事件定义
+// ============================================================
+const RANDOM_EVENTS = [
+    {
+        id: 'charge_flip',
+        name: '⚡ 电荷紊乱',
+        desc: '所有固定电荷极性随机翻转！',
+        duration: 0,   // 瞬时
+        apply: () => {
+            for (const c of state.fixed) {
+                if (Math.random() < 0.6) {
+                    c.sign *= -1;
+                    c.pulse = 1;
+                }
+            }
+            sfxEvent();
+            showToast('⚡ 电荷紊乱！极性随机翻转', 2000, 'warn');
+        }
+    },
+    {
+        id: 'gravity',
+        name: '🌍 引力场',
+        desc: '下方出现额外引力',
+        duration: 8,
+        apply: () => {
+            showToast('🌍 引力场出现！小球向下加速', 2000, 'warn');
+        },
+        tick: (dt) => {
+            if (state.test) {
+                state.test.vy += 180 * dt;
+            }
+        }
+    },
+    {
+        id: 'wind',
+        name: '💨 电场风',
+        desc: '横向电场风扰动',
+        duration: 8,
+        apply: () => {
+            showToast('💨 电场风来袭！横向扰动', 2000, 'warn');
+        },
+        tick: (dt) => {
+            if (state.test) {
+                state.test.vx += Math.sin(performance.now() / 300) * 120 * dt;
+            }
+        }
+    },
+    {
+        id: 'slow',
+        name: '🐌 阻尼增强',
+        desc: '速度暂时降低',
+        duration: 6,
+        apply: () => {
+            showToast('🐌 阻尼增强！移动变慢', 2000, 'warn');
+        },
+        tick: (dt) => {
+            if (state.test) {
+                state.test.vx *= 0.96;
+                state.test.vy *= 0.96;
+            }
+        }
+    },
+    {
+        id: 'boost',
+        name: '🚀 电场加速',
+        desc: '获得额外速度',
+        duration: 0,
+        apply: () => {
+            if (state.test) {
+                const a = rnd(0, Math.PI * 2);
+                state.test.vx += Math.cos(a) * 250;
+                state.test.vy += Math.sin(a) * 250;
+            }
+            sfxEvent();
+            showToast('🚀 电场加速！', 1500, 'success');
+        }
+    },
+    {
+        id: 'new_particle',
+        name: '✨ 新粒子',
+        desc: '场上出现额外收集粒子',
+        duration: 0,
+        apply: () => {
+            for (let attempt = 0; attempt < 100; attempt++) {
+                const x = rnd(W * 0.25, W * 0.75);
+                const y = rnd(60, H - 60);
+                let ok = true;
+                for (const c of state.fixed) {
+                    if (c.type === 'point' && dist(x, y, c.x, c.y) < c.shellR + 30) { ok = false; break; }
+                    if (c.type === 'ring' && Math.abs(dist(x, y, c.x, c.y) - c.R) < 30) { ok = false; break; }
+                    if (c.type === 'disk' && dist(x, y, c.x, c.y) < c.R + 30) { ok = false; break; }
+                    if (c.type === 'line' && Math.abs(x - c.x) < 30) { ok = false; break; }
+                }
+                if (ok) {
+                    state.collectibles.push({
+                        x, y, r: 8, collected: false, pulse: 0,
+                        hue: rnd(0, 360),
+                    });
+                    break;
+                }
+            }
+            sfxEvent();
+            showToast('✨ 新粒子出现！', 1500, 'success');
+        }
+    },
+    {
+        id: 'shrink',
+        name: '🔻 目标收缩',
+        desc: '目标区域暂时缩小',
+        duration: 7,
+        apply: () => {
+            if (state.goal) {
+                state.goal.shrink = 0.55;
+            }
+            showToast('🔻 目标区域收缩！', 2000, 'warn');
+        },
+        tick: (dt) => {
+            if (state.goal && state.goal.shrink !== undefined) {
+                state.goal.shrink = Math.min(1, state.goal.shrink + dt * 0.08);
+                if (state.goal.shrink >= 0.99) {
+                    delete state.goal.shrink;
+                }
+            }
+        },
+        cleanup: () => {
+            if (state.goal) delete state.goal.shrink;
+        }
+    },
+    {
+        id: 'teleport',
+        name: '🌀 随机传送',
+        desc: '小球被随机传送',
+        duration: 0,
+        apply: () => {
+            if (state.test) {
+                for (let attempt = 0; attempt < 200; attempt++) {
+                    const x = rnd(50, W - 50);
+                    const y = rnd(50, H - 50);
+                    let ok = true;
+                    for (const c of state.fixed) {
+                        if (c.type === 'point' && dist(x, y, c.x, c.y) < c.shellR + state.test.r + 10) { ok = false; break; }
+                        if (c.type === 'ring' && Math.abs(dist(x, y, c.x, c.y) - c.R) < state.test.r + 15) { ok = false; break; }
+                        if (c.type === 'disk' && dist(x, y, c.x, c.y) < c.R + state.test.r + 10) { ok = false; break; }
+                        if (c.type === 'line' && Math.abs(x - c.x) < state.test.r + 20) { ok = false; break; }
+                    }
+                    if (ok) {
+                        state.test.x = x;
+                        state.test.y = y;
+                        state.test.vx = 0;
+                        state.test.vy = 0;
+                        break;
+                    }
+                }
+            }
+            sfxEvent();
+            showToast('🌀 小球被传送到了随机位置！', 1800, 'warn');
+        }
+    },
+];
+
+// ============================================================
+//  模型定义
 // ============================================================
 const MODELS = [
-    {   // 0: 双电荷
+    {
         name: '双电荷',
         desc: '正负点电荷 · 经典偶极子',
-        initFixed: () => {
+        elements: () => {
             const S = Math.min(W, H);
-            const margin = Math.max(60, S * 0.18);
+            const margin = Math.max(70, S * 0.20);
             return [
-                { x: margin, y: margin, sign: 1 },
-                { x: W - margin, y: H - margin, sign: -1 },
+                { type: 'point', x: margin, y: H * 0.30, sign: 1 },
+                { type: 'point', x: W - margin, y: H * 0.70, sign: -1 },
             ];
         },
     },
-    {   // 1: 四极子
+    {
         name: '四极子',
         desc: '两对正负电荷交替排列',
-        initFixed: () => {
+        elements: () => {
             const S = Math.min(W, H);
             const cx = W / 2, cy = H / 2;
-            const d = S * 0.28;
+            const d = S * 0.30;
             return [
-                { x: cx - d, y: cy - d, sign: 1 },
-                { x: cx + d, y: cy - d, sign: -1 },
-                { x: cx - d, y: cy + d, sign: -1 },
-                { x: cx + d, y: cy + d, sign: 1 },
+                { type: 'point', x: cx - d, y: cy - d, sign: 1 },
+                { type: 'point', x: cx + d, y: cy - d, sign: -1 },
+                { type: 'point', x: cx - d, y: cy + d, sign: -1 },
+                { type: 'point', x: cx + d, y: cy + d, sign: 1 },
             ];
         },
     },
-    {   // 2: 平行板
+    {
+        name: '圆环',
+        desc: '均匀带电圆环 · 中轴线电场',
+        elements: () => {
+            const S = Math.min(W, H);
+            const R = S * 0.28;
+            return [
+                { type: 'ring', x: W / 2, y: H / 2, R: R, sign: 1, charge: 2.5 },
+            ];
+        },
+    },
+    {
+        name: '圆盘',
+        desc: '均匀带电圆盘 · 轴线电场',
+        elements: () => {
+            const S = Math.min(W, H);
+            const R = S * 0.30;
+            return [
+                { type: 'disk', x: W / 2, y: H / 2, R: R, sign: 1, charge: 3.0 },
+            ];
+        },
+    },
+    {
+        name: '无限长直线',
+        desc: '均匀带电直线 · 径向电场',
+        elements: () => {
+            return [
+                { type: 'line', x: W / 2, y1: 0, y2: H, sign: 1, charge: 2.0 },
+            ];
+        },
+    },
+    {
         name: '平行板',
         desc: '上下极板模拟匀强电场',
-        initFixed: () => {
+        elements: () => {
             const S = Math.min(W, H);
-            const margin = Math.max(50, S * 0.14);
+            const margin = Math.max(60, S * 0.16);
             const n = 5;
             const xs = [];
             for (let i = 0; i < n; i++) {
@@ -116,22 +389,23 @@ const MODELS = [
             const topY = margin;
             const botY = H - margin;
             const charges = [];
-            xs.forEach(x => charges.push({ x, y: topY, sign: 1 }));
-            xs.forEach(x => charges.push({ x, y: botY, sign: -1 }));
+            xs.forEach(x => charges.push({ type: 'point', x, y: topY, sign: 1 }));
+            xs.forEach(x => charges.push({ type: 'point', x, y: botY, sign: -1 }));
             return charges;
         },
     },
-    {   // 3: 六角环
+    {
         name: '六角环',
         desc: '正负电荷交替在六边形顶点',
-        initFixed: () => {
+        elements: () => {
             const S = Math.min(W, H);
             const cx = W / 2, cy = H / 2;
-            const R = S * 0.32;
+            const R = S * 0.34;
             const charges = [];
             for (let i = 0; i < 6; i++) {
                 const a = (i / 6) * Math.PI * 2 - Math.PI / 2;
                 charges.push({
+                    type: 'point',
                     x: cx + R * Math.cos(a),
                     y: cy + R * Math.sin(a),
                     sign: i % 2 === 0 ? 1 : -1,
@@ -140,38 +414,106 @@ const MODELS = [
             return charges;
         },
     },
-    {   // 4: 偶极子
+    {
         name: '偶极子',
         desc: '正负电荷靠得很近',
-        initFixed: () => {
+        elements: () => {
             const S = Math.min(W, H);
             const cx = W / 2, cy = H / 2;
-            const d = S * 0.12;
+            const d = S * 0.14;
             return [
-                { x: cx - d, y: cy, sign: 1 },
-                { x: cx + d, y: cy, sign: -1 },
+                { type: 'point', x: cx - d, y: cy - d * 0.6, sign: 1 },
+                { type: 'point', x: cx + d, y: cy + d * 0.6, sign: -1 },
             ];
+        },
+    },
+    {
+        name: '随机狂野',
+        desc: '完全随机 · 每个电荷都随机',
+        elements: () => {
+            const S = Math.min(W, H);
+            const count = rndInt(3, 6);
+            const charges = [];
+            const placed = [];
+            for (let i = 0; i < count; i++) {
+                let pos = null;
+                for (let attempt = 0; attempt < 100; attempt++) {
+                    const x = rnd(60, W - 60);
+                    const y = rnd(60, H - 60);
+                    let ok = true;
+                    for (const p of placed) {
+                        if (dist(x, y, p.x, p.y) < S * 0.18) { ok = false; break; }
+                    }
+                    if (ok) { pos = { x, y }; break; }
+                }
+                if (!pos) pos = { x: rnd(60, W - 60), y: rnd(60, H - 60) };
+                placed.push(pos);
+                charges.push({
+                    type: Math.random() < 0.75 ? 'point' : (Math.random() < 0.5 ? 'ring' : 'disk'),
+                    x: pos.x, y: pos.y,
+                    sign: Math.random() < 0.5 ? 1 : -1,
+                    R: rnd(S * 0.12, S * 0.22),
+                    charge: rnd(1.5, 3.0),
+                });
+            }
+            return charges;
         },
     },
 ];
 
 // ============================================================
-//  放置固定电荷（含硬壳，不可穿透）
+//  放置固定带电体
 // ============================================================
 function placeFixedCharges() {
     const S = Math.min(W, H);
-    const fixedR = clamp(S * 0.026, 13, 22);
-    const shellR = fixedR * 1.40;   // 硬壳半径，保证试验电荷无法重叠
+    const fixedR = clamp(S * 0.028, 14, 24);
+    const shellR = fixedR * 1.38;
 
-    const raw = MODELS[state.modelIndex].initFixed();
-    return raw.map(c => ({
-        x: c.x,
-        y: c.y,
-        r: fixedR,
-        shellR: shellR,
-        sign: c.sign,
-        pulse: 0,
-    }));
+    const raw = MODELS[state.modelIndex].elements();
+    return raw.map(c => {
+        if (c.type === 'point') {
+            return {
+                type: 'point',
+                x: c.x, y: c.y,
+                r: fixedR,
+                shellR: shellR,
+                sign: c.sign,
+                pulse: 0,
+            };
+        } else if (c.type === 'ring') {
+            return {
+                type: 'ring',
+                x: c.x, y: c.y,
+                R: c.R,
+                sign: c.sign,
+                charge: c.charge || 2.0,
+                pulse: 0,
+                shellR: 0,
+            };
+        } else if (c.type === 'disk') {
+            return {
+                type: 'disk',
+                x: c.x, y: c.y,
+                R: c.R,
+                sign: c.sign,
+                charge: c.charge || 3.0,
+                pulse: 0,
+                shellR: 0,
+            };
+        } else if (c.type === 'line') {
+            return {
+                type: 'line',
+                x: c.x,
+                y1: c.y1 !== undefined ? c.y1 : 0,
+                y2: c.y2 !== undefined ? c.y2 : H,
+                sign: c.sign,
+                charge: c.charge || 2.0,
+                pulse: 0,
+                shellR: 0,
+            };
+        }
+        return c;
+    });
 }
 
 // ============================================================
@@ -182,55 +524,181 @@ function newGame() {
     state.elapsed = 0;
     state.phase   = 'playing';
     state.trail   = [];
+    state.particles = [];
+    state.dragging = null;
+    state.hoverTarget = null;
+    state.eventTimer = 0;
+    state.activeEvents = [];
+    state.goalParticles = 3;
+    state.goalsCompleted = 0;
 
     const S = Math.min(W, H);
-    const margin = Math.max(50, S * 0.12);
+    const margin = Math.max(55, S * 0.13);
 
-    // 先放置固定电荷，用于后续避让
     state.fixed = placeFixedCharges();
 
-    // 放置试验电荷（避开固定电荷的硬壳）
-    const testR = clamp(S * 0.020, 10, 16);
+    const testR = clamp(S * 0.022, 11, 18);
     let testPos = null;
-    for (let attempt = 0; attempt < 300; attempt++) {
-        const x = rnd(margin, W - margin);
+    for (let attempt = 0; attempt < 500; attempt++) {
+        const x = rnd(margin, W * 0.30);
         const y = rnd(margin, H - margin);
         let ok = true;
         for (const c of state.fixed) {
-            if (dist(x, y, c.x, c.y) < c.shellR + testR + 16) { ok = false; break; }
+            if (c.type === 'point' && dist(x, y, c.x, c.y) < c.shellR + testR + 20) { ok = false; break; }
+            if (c.type === 'ring' && Math.abs(dist(x, y, c.x, c.y) - c.R) < testR + 20) { ok = false; break; }
+            if (c.type === 'disk' && dist(x, y, c.x, c.y) < c.R + testR + 20) { ok = false; break; }
+            if (c.type === 'line' && Math.abs(x - c.x) < testR + 30) { ok = false; break; }
         }
         if (ok) { testPos = { x, y }; break; }
     }
-    if (!testPos) testPos = { x: W / 2, y: H / 2 };
+    if (!testPos) testPos = { x: W * 0.15, y: H / 2 };
     state.test = { x: testPos.x, y: testPos.y, vx: 0, vy: 0, r: testR };
 
-    // 放置目标区域（尽量远离固定电荷）
-    const goalR = clamp(S * 0.065, 32, 50);
+    const goalR = clamp(S * 0.070, 36, 55);
     let goalPos = null;
-    for (let attempt = 0; attempt < 300; attempt++) {
-        const x = rnd(margin + goalR, W - margin - goalR);
-        const y = rnd(margin + goalR, H - margin - goalR);
-        if (dist(x, y, state.test.x, state.test.y) < goalR * 2.2) continue;
+    for (let attempt = 0; attempt < 500; attempt++) {
+        const x = rnd(W * 0.65, W - margin);
+        const y = rnd(margin, H - margin);
+        if (dist(x, y, state.test.x, state.test.y) < goalR * 2.0) continue;
         let ok = true;
         for (const c of state.fixed) {
-            if (dist(x, y, c.x, c.y) < c.shellR + goalR + 16) { ok = false; break; }
+            if (c.type === 'point' && dist(x, y, c.x, c.y) < c.shellR + goalR + 24) { ok = false; break; }
+            if (c.type === 'ring' && Math.abs(dist(x, y, c.x, c.y) - c.R) < goalR + 24) { ok = false; break; }
+            if (c.type === 'disk' && dist(x, y, c.x, c.y) < c.R + goalR + 24) { ok = false; break; }
+            if (c.type === 'line' && Math.abs(x - c.x) < goalR + 30) { ok = false; break; }
         }
         if (ok) { goalPos = { x, y }; break; }
     }
-    if (!goalPos) goalPos = { x: W * 0.75, y: H * 0.75 };
+    if (!goalPos) goalPos = { x: W * 0.80, y: H * 0.70 };
     state.goal = { x: goalPos.x, y: goalPos.y, r: goalR };
+
+    state.collectibles = [];
+    for (let i = 0; i < state.goalParticles; i++) {
+        for (let attempt = 0; attempt < 300; attempt++) {
+            const x = rnd(W * 0.30, W * 0.70);
+            const y = rnd(margin, H - margin);
+            if (dist(x, y, state.test.x, state.test.y) < 80) continue;
+            if (dist(x, y, state.goal.x, state.goal.y) < 80) continue;
+            let ok = true;
+            for (const c of state.fixed) {
+                if (c.type === 'point' && dist(x, y, c.x, c.y) < c.shellR + 30) { ok = false; break; }
+                if (c.type === 'ring' && Math.abs(dist(x, y, c.x, c.y) - c.R) < 30) { ok = false; break; }
+                if (c.type === 'disk' && dist(x, y, c.x, c.y) < c.R + 30) { ok = false; break; }
+                if (c.type === 'line' && Math.abs(x - c.x) < 30) { ok = false; break; }
+            }
+            if (ok) {
+                state.collectibles.push({
+                    x, y, r: 8, collected: false, pulse: 0,
+                    hue: i * 120,
+                });
+                break;
+            }
+        }
+    }
 }
 
 // ============================================================
-//  电势能计算（用于 HUD 显示）
+//  电场计算
 // ============================================================
+function fieldRing(t, c) {
+    const dx = t.x - c.x, dy = t.y - c.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 1) return { fx: 0, fy: 0 };
+    const nx = dx / d, ny = dy / d;
+    const q = c.sign * c.charge * Q_FIXED;
+    if (d > c.R * 2.5) {
+        const d2 = d * d + SOFT * SOFT;
+        const r = Math.sqrt(d2);
+        const k = q / (d2 * r) * (1 + r * FAR_BOOST);
+        return { fx: k * dx, fy: k * dy };
+    }
+    const d2 = d * d + SOFT * SOFT;
+    const r = Math.sqrt(d2);
+    const k = q / (d2 * r) * (1 + r * FAR_BOOST);
+    const radialFactor = d > c.R ? 1.0 : d / c.R;
+    const ringPenalty = Math.exp(-Math.abs(d - c.R) / (c.R * 0.3)) * 0.8;
+    return {
+        fx: k * nx * (radialFactor + ringPenalty),
+        fy: k * ny * (radialFactor + ringPenalty),
+    };
+}
+
+function fieldDisk(t, c) {
+    const dx = t.x - c.x, dy = t.y - c.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 1) return { fx: 0, fy: 0 };
+    const nx = dx / d, ny = dy / d;
+    const q = c.sign * c.charge * Q_FIXED;
+    if (d > c.R * 3) {
+        const d2 = d * d + SOFT * SOFT;
+        const r = Math.sqrt(d2);
+        const k = q / (d2 * r) * (1 + r * FAR_BOOST);
+        return { fx: k * dx, fy: k * dy };
+    }
+    const d2 = d * d + SOFT * SOFT;
+    const r = Math.sqrt(d2);
+    const k = q / (d2 * r) * (1 + r * FAR_BOOST);
+    const factor = d > c.R ? 1.0 : -d / c.R * 0.6;
+    const diskPenalty = Math.exp(-Math.abs(d - c.R) / (c.R * 0.25)) * 1.0;
+    return {
+        fx: k * nx * (factor + diskPenalty),
+        fy: k * ny * (factor + diskPenalty),
+    };
+}
+
+function fieldLine(t, c) {
+    const dx = t.x - c.x;
+    const d = Math.abs(dx);
+    if (d < 1) return { fx: 0, fy: 0 };
+    const nx = dx / d;
+    const q = c.sign * c.charge * Q_FIXED;
+    const k = q / (d * (d + SOFT)) * (1 + d * FAR_BOOST);
+    return { fx: k * nx, fy: 0 };
+}
+
+function fieldAt(x, y) {
+    let fx = 0, fy = 0;
+    for (const c of state.fixed) {
+        if (c.type === 'point') {
+            const q = c.sign * Q_FIXED;
+            const dx = x - c.x, dy = y - c.y;
+            const d2 = dx * dx + dy * dy + SOFT * SOFT;
+            const r = Math.sqrt(d2);
+            const k = q / (d2 * r) * (1 + r * FAR_BOOST);
+            fx += k * dx;
+            fy += k * dy;
+        } else if (c.type === 'ring') {
+            const f = fieldRing({ x, y }, c);
+            fx += f.fx; fy += f.fy;
+        } else if (c.type === 'disk') {
+            const f = fieldDisk({ x, y }, c);
+            fx += f.fx; fy += f.fy;
+        } else if (c.type === 'line') {
+            const f = fieldLine({ x, y }, c);
+            fx += f.fx; fy += f.fy;
+        }
+    }
+    return { fx, fy };
+}
+
 function calcPotentialEnergy() {
     const t = state.test;
     if (!t) return 0;
     let U = 0;
     for (const c of state.fixed) {
-        const d = Math.max(dist(t.x, t.y, c.x, c.y), SOFT);
-        U += (c.sign * Q_FIXED * 1.0) / d;   // 试探电荷 +1.0C
+        if (c.type === 'point') {
+            const d = Math.max(dist(t.x, t.y, c.x, c.y), SOFT);
+            U += (c.sign * Q_FIXED * 1.0) / d;
+        } else if (c.type === 'ring') {
+            const d = Math.max(dist(t.x, t.y, c.x, c.y), SOFT);
+            U += (c.sign * c.charge * Q_FIXED * 1.0) / d;
+        } else if (c.type === 'disk') {
+            const d = Math.max(dist(t.x, t.y, c.x, c.y), SOFT);
+            U += (c.sign * c.charge * Q_FIXED * 1.0) / d;
+        } else if (c.type === 'line') {
+            const d = Math.max(Math.abs(t.x - c.x), SOFT);
+            U += -(c.sign * c.charge * Q_FIXED * 1.0) * Math.log(d / 100);
+        }
     }
     return U;
 }
@@ -244,435 +712,80 @@ function update(dt) {
         if (c.pulse > 0) c.pulse = Math.max(0, c.pulse - dt * 4);
     }
 
+    for (const col of state.collectibles) {
+        if (col.pulse > 0) col.pulse = Math.max(0, col.pulse - dt * 3);
+    }
+
+    for (let i = state.particles.length - 1; i >= 0; i--) {
+        const p = state.particles[i];
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.life -= dt;
+        p.vx *= 0.98;
+        p.vy *= 0.98;
+        if (p.life <= 0) state.particles.splice(i, 1);
+    }
+
     if (state.phase !== 'playing') return;
 
     state.elapsed += dt;
 
+    // ---- 随机事件系统 ----
+    state.eventTimer += dt;
+    if (state.eventTimer >= state.eventInterval) {
+        state.eventTimer = 0;
+        // 每关增加事件频率
+        state.eventInterval = Math.max(6, 12 - state.level * 1.5);
+        triggerRandomEvent();
+    }
+
+    // 更新持续事件
+    for (let i = state.activeEvents.length - 1; i >= 0; i--) {
+        const ev = state.activeEvents[i];
+        ev.remaining -= dt;
+        if (ev.tick) ev.tick(dt);
+        if (ev.remaining <= 0) {
+            if (ev.cleanup) ev.cleanup();
+            state.activeEvents.splice(i, 1);
+        }
+    }
+
     const t = state.test;
-    let fx = 0, fy = 0;
 
-    // 库仑力（只来自固定电荷）
-    for (let i = 0; i < state.fixed.length; i++) {
-        const c = state.fixed[i];
-        const q = c.sign * Q_FIXED;
-        const dx = t.x - c.x, dy = t.y - c.y;
-        const d2 = dx * dx + dy * dy + SOFT * SOFT;
-        const r = Math.sqrt(d2);
-        const k = q / (d2 * r) * (1 + r * FAR_BOOST);
-        fx += k * dx;
-        fy += k * dy;
-    }
-
-    // 过阻尼积分
-    t.vx += (fx - DRAG * t.vx) / MASS * dt;
-    t.vy += (fy - DRAG * t.vy) / MASS * dt;
-
-    const sp = Math.hypot(t.vx, t.vy);
-    if (sp > MAX_SPEED) {
-        t.vx = t.vx / sp * MAX_SPEED;
-        t.vy = t.vy / sp * MAX_SPEED;
-    }
-
-    const px = t.x, py = t.y;
-    t.x += t.vx * dt;
-    t.y += t.vy * dt;
-
-    // 边界反弹
-    const pad = t.r + 2;
-    if (t.x < pad)          { t.x = pad;     t.vx = Math.abs(t.vx) * 0.5; }
-    else if (t.x > W - pad) { t.x = W - pad; t.vx = -Math.abs(t.vx) * 0.5; }
-    if (t.y < pad)          { t.y = pad;     t.vy = Math.abs(t.vy) * 0.5; }
-    else if (t.y > H - pad) { t.y = H - pad; t.vy = -Math.abs(t.vy) * 0.5; }
-
-    // 硬壳碰撞：推出到壳外，保留切向速度
-    for (let i = 0; i < state.fixed.length; i++) {
-        const c = state.fixed[i];
-        const dx = t.x - c.x, dy = t.y - c.y;
-        let d = Math.hypot(dx, dy);
-        const minD = c.shellR + t.r;
-
-        if (d < minD) {
-            if (d < 0.001) {
-                t.x = c.x + minD;
-                t.y = c.y;
-                t.vx = 0;
-                t.vy = 0;
+    // 拖动试验电荷
+    if (state.dragging && state.dragging.type === 'test') {
+        const d = state.dragging;
+        t.x = clamp(state.mouseX + d.offsetX, t.r + 2, W - t.r - 2);
+        t.y = clamp(state.mouseY + d.offsetY, t.r + 2, H - t.r - 2);
+        t.vx = 0; t.vy = 0;
+    } else {
+        let fx = 0, fy = 0;
+        for (let i = 0; i < state.fixed.length; i++) {
+            const c = state.fixed[i];
+            let f;
+            if (c.type === 'point') {
+                const q = c.sign * Q_FIXED;
+                const dx = t.x - c.x, dy = t.y - c.y;
+                const d2 = dx * dx + dy * dy + SOFT * SOFT;
+                const r = Math.sqrt(d2);
+                const k = q / (d2 * r) * (1 + r * FAR_BOOST);
+                f = { fx: k * dx, fy: k * dy };
+            } else if (c.type === 'ring') {
+                f = fieldRing(t, c);
+            } else if (c.type === 'disk') {
+                f = fieldDisk(t, c);
+            } else if (c.type === 'line') {
+                f = fieldLine(t, c);
             } else {
-                const nx = dx / d, ny = dy / d;
-                t.x = c.x + nx * minD;
-                t.y = c.y + ny * minD;
-                const vn = t.vx * nx + t.vy * ny;
-                if (vn < 0) {
-                    t.vx -= vn * nx;
-                    t.vy -= vn * ny;
-                }
+                f = { fx: 0, fy: 0 };
             }
+            fx += f.fx;
+            fy += f.fy;
         }
-    }
 
-    // 轨迹
-    if (Math.hypot(t.x - px, t.y - py) > 1.8) {
-        state.trail.push({ x: t.x, y: t.y });
-        if (state.trail.length > 60) state.trail.shift();
-    }
+        t.vx += (fx - DRAG * t.vx) / MASS * dt;
+        t.vy += (fy - DRAG * t.vy) / MASS * dt;
 
-    // 到达目标
-    const gd = dist(t.x, t.y, state.goal.x, state.goal.y);
-    if (gd < state.goal.r) {
-        state.phase = 'won';
-        state.winAt = performance.now();
-    }
-}
-
-// ============================================================
-//  渲染
-// ============================================================
-function render() {
-    const now = performance.now();
-
-    ctx.fillStyle = '#0f0f1a';
-    ctx.fillRect(0, 0, W, H);
-
-    // 背景网格（淡）
-    ctx.save();
-    ctx.strokeStyle = '#1a1a2e';
-    ctx.lineWidth = 0.6;
-    ctx.globalAlpha = 0.35;
-    const gridSize = 50;
-    for (let x = 0; x <= W; x += gridSize) {
-        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
-    }
-    for (let y = 0; y <= H; y += gridSize) {
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-    }
-    ctx.restore();
-
-    drawGoal(now);
-    drawTrail();
-    drawFixedCharges(now);
-    drawTestCharge();
-    drawHUD();
-    drawResetButton();
-
-    if (state.phase === 'won') drawWinOverlay();
-}
-
-// ---- 目标区域 ----
-function drawGoal(now) {
-    const g = state.goal;
-    if (!g) return;
-    const pulse = 1 + Math.sin(now / 420) * 0.045;
-    const R = g.r * pulse;
-
-    const grad = ctx.createRadialGradient(g.x, g.y, 0, g.x, g.y, R);
-    grad.addColorStop(0,   'rgba(46, 213, 115, 0.16)');
-    grad.addColorStop(0.7, 'rgba(46, 213, 115, 0.06)');
-    grad.addColorStop(1,   'rgba(46, 213, 115, 0)');
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(g.x, g.y, R, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.save();
-    ctx.setLineDash([9, 9]);
-    ctx.lineDashOffset = -now / 60;
-    ctx.strokeStyle = 'rgba(46, 213, 115, 0.75)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(g.x, g.y, R, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-
-    ctx.strokeStyle = 'rgba(46, 213, 115, 0.35)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(g.x - 8, g.y); ctx.lineTo(g.x + 8, g.y);
-    ctx.moveTo(g.x, g.y - 8); ctx.lineTo(g.x, g.y + 8);
-    ctx.stroke();
-}
-
-// ---- 试验电荷轨迹 ----
-function drawTrail() {
-    const tr = state.trail;
-    if (tr.length < 2) return;
-
-    ctx.save();
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    for (let i = 1; i < tr.length; i++) {
-        const a = (i / tr.length) * 0.30;
-        ctx.strokeStyle = 'rgba(46, 213, 115, ' + a + ')';
-        ctx.lineWidth = 1 + (i / tr.length) * 2.2;
-        ctx.beginPath();
-        ctx.moveTo(tr[i - 1].x, tr[i - 1].y);
-        ctx.lineTo(tr[i].x, tr[i].y);
-        ctx.stroke();
-    }
-    ctx.restore();
-}
-
-// ---- 固定电荷（含硬壳）----
-function drawFixedCharges(now) {
-    for (let i = 0; i < state.fixed.length; i++) {
-        const c = state.fixed[i];
-        const isPos = c.sign > 0;
-        const rgb = isPos ? '255, 92, 108' : '77, 124, 255';
-        const R = c.r * (1 + c.pulse * 0.45);
-
-        // 硬壳（虚线圆环）
-        ctx.save();
-        ctx.setLineDash([5, 5]);
-        ctx.lineDashOffset = -now / 80;
-        ctx.strokeStyle = 'rgba(' + rgb + ', 0.50)';
-        ctx.lineWidth = 1.8;
-        ctx.beginPath();
-        ctx.arc(c.x, c.y, c.shellR, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
-
-        // 壳内微弱氛围
-        ctx.beginPath();
-        ctx.arc(c.x, c.y, c.shellR, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(' + rgb + ', 0.05)';
-        ctx.fill();
-
-        // 外发光
-        const g = ctx.createRadialGradient(c.x, c.y, R * 0.5, c.x, c.y, R * 2.8);
-        g.addColorStop(0, 'rgba(' + rgb + ', ' + (0.28 + c.pulse * 0.30) + ')');
-        g.addColorStop(1, 'rgba(' + rgb + ', 0)');
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.arc(c.x, c.y, R * 2.8, 0, Math.PI * 2);
-        ctx.fill();
-
-        // 主体
-        ctx.beginPath();
-        ctx.arc(c.x, c.y, R, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgb(' + rgb + ')';
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        // 正负号
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 2.8;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(c.x - R * 0.38, c.y);
-        ctx.lineTo(c.x + R * 0.38, c.y);
-        if (isPos) {
-            ctx.moveTo(c.x, c.y - R * 0.38);
-            ctx.lineTo(c.x, c.y + R * 0.38);
-        }
-        ctx.stroke();
-    }
-}
-
-// ---- 试验电荷 ----
-function drawTestCharge() {
-    const t = state.test;
-    if (!t) return;
-
-    // 根据电势能调整颜色微调（高能偏红，低能偏蓝）
-    const U = calcPotentialEnergy();
-    const intensity = clamp(U / 2e6, -1, 1);
-    const r = Math.round(46 + 80 * Math.max(0, intensity));
-    const g = Math.round(213 - 50 * Math.abs(intensity));
-    const b = Math.round(115 + 100 * Math.max(0, -intensity));
-
-    ctx.save();
-    ctx.shadowColor = `rgb(${r}, ${g}, ${b})`;
-    ctx.shadowBlur = 22 + 18 * Math.abs(intensity);
-
-    ctx.beginPath();
-    ctx.arc(t.x, t.y, t.r, 0, Math.PI * 2);
-    ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
-    ctx.fill();
-    ctx.restore();
-
-    ctx.strokeStyle = '#0f0f1a';
-    ctx.lineWidth = 2.4;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(t.x - 4.5, t.y); ctx.lineTo(t.x + 4.5, t.y);
-    ctx.moveTo(t.x, t.y - 4.5); ctx.lineTo(t.x, t.y + 4.5);
-    ctx.stroke();
-}
-
-// ---- HUD ----
-function drawHUD() {
-    ctx.save();
-    ctx.font = '600 14px system-ui, sans-serif';
-
-    // 左上：模型名称
-    ctx.textAlign = 'left';
-    ctx.fillStyle = 'rgba(160, 200, 255, 0.85)';
-    ctx.fillText('⚡ ' + MODELS[state.modelIndex].name, 18, 30);
-
-    // 左上：电势能
-    const U = calcPotentialEnergy();
-    ctx.fillStyle = 'rgba(255, 220, 120, 0.9)';
-    ctx.font = '700 16px system-ui, sans-serif';
-    ctx.fillText('U = ' + U.toFixed(2) + ' J', 18, 56);
-
-    // 右上：计时 + 翻转次数
-    ctx.textAlign = 'right';
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
-    ctx.font = '600 14px system-ui, sans-serif';
-    ctx.fillText(state.elapsed.toFixed(1) + ' s', W - 18, 30);
-
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-    ctx.fillText('翻转 ' + state.flipped, W - 18, 56);
-
-    // 顶部中央：模型描述
-    ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(200, 220, 255, 0.40)';
-    ctx.font = '400 13px system-ui, sans-serif';
-    ctx.fillText(MODELS[state.modelIndex].desc, W / 2, 30);
-
-    ctx.restore();
-}
-
-// ---- 重开按钮 ----
-function drawResetButton() {
-    const bx = W - 36, by = H - 36, br = 18;
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(bx, by, br, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.07)';
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.arc(bx, by, 7, 0.7, 5.4);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(bx + 5, by - 8);
-    ctx.lineTo(bx + 8, by - 2);
-    ctx.lineTo(bx + 1, by - 2);
-    ctx.stroke();
-    ctx.restore();
-}
-
-// ---- 胜利遮罩 ----
-function drawWinOverlay() {
-    ctx.fillStyle = 'rgba(8, 10, 20, 0.78)';
-    ctx.fillRect(0, 0, W, H);
-
-    ctx.textAlign = 'center';
-
-    ctx.fillStyle = '#2ed573';
-    ctx.font = '700 32px system-ui, sans-serif';
-    ctx.fillText('电荷已抵达目标', W / 2, H / 2 - 34);
-
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-    ctx.font = '400 17px system-ui, sans-serif';
-    ctx.fillText('用时 ' + state.elapsed.toFixed(1) + ' 秒 · 翻转 ' + state.flipped + ' 次', W / 2, H / 2 + 10);
-
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-    ctx.font = '400 14px system-ui, sans-serif';
-    ctx.fillText('点击屏幕 / 按 R 键  ·  开始新的一局', W / 2, H / 2 + 54);
-
-    // 切换模型按钮提示
-    ctx.fillStyle = 'rgba(160, 200, 255, 0.50)';
-    ctx.font = '400 13px system-ui, sans-serif';
-    ctx.fillText('← 顶部点击切换模型 →', W / 2, H - 40);
-}
-
-// ============================================================
-//  输入
-// ============================================================
-canvas.addEventListener('pointerdown', function (e) {
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    // 右下角重开按钮
-    if (dist(x, y, W - 36, H - 36) < 28) {
-        newGame();
-        return;
-    }
-
-    if (state.phase === 'won') {
-        if (performance.now() - state.winAt > 400) newGame();
-        return;
-    }
-
-    // 点击固定电荷 → 翻转符号
-    for (let i = state.fixed.length - 1; i >= 0; i--) {
-        const c = state.fixed[i];
-        if (dist(x, y, c.x, c.y) < c.shellR + 12) {
-            c.sign *= -1;
-            c.pulse = 1;
-            state.flipped++;
-            return;
-        }
-    }
-});
-
-// 键盘：R 重开，1-5 切换模型
-window.addEventListener('keydown', function (e) {
-    if (e.code === 'KeyR') {
-        newGame();
-    } else if (e.code === 'Space' && state.phase === 'won') {
-        e.preventDefault();
-        newGame();
-    } else if (e.code === 'Digit1' || e.code === 'Numpad1') {
-        state.modelIndex = 0; newGame();
-    } else if (e.code === 'Digit2' || e.code === 'Numpad2') {
-        state.modelIndex = 1; newGame();
-    } else if (e.code === 'Digit3' || e.code === 'Numpad3') {
-        state.modelIndex = 2; newGame();
-    } else if (e.code === 'Digit4' || e.code === 'Numpad4') {
-        state.modelIndex = 3; newGame();
-    } else if (e.code === 'Digit5' || e.code === 'Numpad5') {
-        state.modelIndex = 4; newGame();
-    }
-});
-
-// ============================================================
-//  窗口尺寸变化
-// ============================================================
-let resizeTimer = 0;
-window.addEventListener('resize', function () {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(function () {
-        resize();
-        newGame();
-    }, 180);
-});
-
-// ============================================================
-//  主循环
-// ============================================================
-let lastTime = 0;
-
-function loop(now) {
-    if (!lastTime) lastTime = now;
-    const dt = Math.min((now - lastTime) / 1000, 0.05);
-    lastTime = now;
-
-    update(dt);
-    render();
-
-    requestAnimationFrame(loop);
-}
-
-// ============================================================
-//  启动
-// ============================================================
-resize();
-newGame();
-requestAnimationFrame(loop);
-
-})();
-</script>
-</body>
-</html>
+        const sp = Math.hypot(t.vx, t.vy);
+        if (sp > MAX_SPEED) {
+            t.vx
